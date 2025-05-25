@@ -2,17 +2,17 @@
 package_manager = "yarn"
 
 [features]
-resolution = true
+seeds = false
 skip-lint = false
 
-[programs.localnet]
+[programs.devnet]
 d_storage_app = "Ed5i4GsQCTU5NLvgieHUWHFAGfBJ61NfktWw271fesEJ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
