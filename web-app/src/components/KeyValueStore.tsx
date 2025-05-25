@@ -23,6 +23,7 @@ const KeyValueStore: FC = () => {
   const [allPairs, setAllPairs] = useState<{ key: string; value: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [newOwnerAddress, setNewOwnerAddress] = useState('');
 
   const publicKey = wallet?.publicKey || null;
 
@@ -148,11 +149,16 @@ const KeyValueStore: FC = () => {
       const newStoreAccount = Keypair.generate();
       console.log('Generated store account:', newStoreAccount.publicKey.toString());
       setStoreAccount(newStoreAccount);
+
+      // Initialize the store if we have a program
+      if (program) {
+        initializeStore();
+      }
     }
-  }, [publicKey]);
+  }, [publicKey, program]);
 
   const initializeStore = async () => {
-    if (!program || !publicKey) {
+    if (!program || !publicKey || !storeAccount) {
       console.error('Missing required data:', { publicKey, storeAccount, program });
       setStatus('Error: Program or wallet not initialized');
       return;
@@ -162,30 +168,25 @@ const KeyValueStore: FC = () => {
       setLoading(true);
       setStatus('Initializing store...');
 
-      const newStoreAccount = Keypair.generate();
-      setStoreAccount(newStoreAccount);
-
       console.log('Initializing store with accounts:', {
-        store: newStoreAccount.publicKey.toString(),
-        signer: publicKey.toString(),
-        systemProgram: SystemProgram.programId.toString()
+        store: storeAccount.publicKey.toString(),
+        signer: publicKey.toString()
       });
 
       const tx = await program.methods
         .initialize()
         .accounts({
-          store: newStoreAccount.publicKey,
-          signer: publicKey,
-          systemProgram: SystemProgram.programId
+          store: storeAccount.publicKey,
+          signer: publicKey
         })
-        .signers([newStoreAccount])
+        .signers([storeAccount])
         .rpc();
 
       console.log('Store initialized successfully:', tx);
       setStatus('Store initialized successfully!');
     } catch (error) {
       console.error('Error initializing store:', error);
-      setStatus('Error initializing store');
+      setStatus('Error initializing store: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -321,6 +322,48 @@ const KeyValueStore: FC = () => {
     }
   };
 
+  const transferOwnership = async () => {
+    if (!program || !publicKey || !storeAccount) {
+      setStatus('Please connect your wallet and initialize a store first');
+      return;
+    }
+
+    if (!newOwnerAddress) {
+      setStatus('Please enter the new owner address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatus('Transferring ownership...');
+
+      let newOwnerPubkey;
+      try {
+        newOwnerPubkey = new PublicKey(newOwnerAddress);
+      } catch (e) {
+        setStatus('Invalid Solana address');
+        return;
+      }
+
+      const tx = await program.methods
+        .transferOwnership(newOwnerPubkey)
+        .accounts({
+          store: storeAccount.publicKey,
+          signer: publicKey
+        })
+        .rpc();
+
+      console.log('Ownership transferred successfully:', tx);
+      setStatus('Ownership transferred successfully!');
+      setNewOwnerAddress('');
+    } catch (error) {
+      console.error('Error transferring ownership:', error);
+      setStatus('Error transferring ownership: ' + (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="key-value-store">
       <div className="wallet-section">
@@ -333,6 +376,19 @@ const KeyValueStore: FC = () => {
             <h2>Store Account: {storeAccount?.publicKey.toString()}</h2>
             <button onClick={initializeStore} disabled={loading}>
               Initialize Store
+            </button>
+          </div>
+
+          <div className="transfer-section">
+            <h2>Transfer Ownership</h2>
+            <input
+              type="text"
+              placeholder="New owner's Solana address"
+              value={newOwnerAddress}
+              onChange={(e) => setNewOwnerAddress(e.target.value)}
+            />
+            <button onClick={transferOwnership} disabled={loading}>
+              Transfer Ownership
             </button>
           </div>
 

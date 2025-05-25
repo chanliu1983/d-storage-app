@@ -73,6 +73,15 @@ pub mod d_storage_app {
         
         Ok(())
     }
+
+    pub fn transfer_ownership(ctx: Context<TransferOwnership>, new_owner: Pubkey) -> Result<()> {
+        let store = &mut ctx.accounts.store;
+        require!(store.owner == ctx.accounts.signer.key(), ErrorCode::Unauthorized);
+        
+        store.owner = new_owner;
+        msg!("Store ownership transferred to: {}", new_owner);
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -95,6 +104,14 @@ pub struct Save<'info> {
 #[derive(Accounts)]
 pub struct Query<'info> {
     pub store: Account<'info, KeyValueStore>,
+}
+
+#[derive(Accounts)]
+pub struct TransferOwnership<'info> {
+    #[account(mut)]
+    pub store: Account<'info, KeyValueStore>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
 }
 
 #[account]
