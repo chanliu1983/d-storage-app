@@ -9,20 +9,22 @@ describe("d-storage-app", () => {
   anchor.setProvider(provider);
   const program = anchor.workspace.DStorageApp as Program<DStorageApp>;
 
-  it("Should log program ID", async () => {
+  it("Should save and query key-value pair", async () => {
     // Create a new keypair for the data account
     const dataAccount = anchor.web3.Keypair.generate();
+    const key = "test_key";
+    const value = "test_value";
 
-    // 发送交易
-    const txSignature = await program.methods.initialize().accounts({
+    // Save the key-value pair
+    const saveTx = await program.methods.save(key, value).accounts({
       data: dataAccount.publicKey,
       signer: provider.wallet.publicKey,
-      systemProgram: anchor.web3.SystemProgram.programId,
+      system_program: anchor.web3.SystemProgram.programId,
     }).signers([dataAccount]).rpc();
 
-    // 等待交易确认
+    // Wait for transaction confirmation
     await provider.connection.confirmTransaction({
-      signature: txSignature,
+      signature: saveTx,
       blockhash: (await provider.connection.getLatestBlockhash()).blockhash,
       lastValidBlockHeight: (await provider.connection.getLatestBlockhash()).lastValidBlockHeight,
     });
@@ -30,8 +32,23 @@ describe("d-storage-app", () => {
     // Add a small delay to ensure transaction is processed
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // 获取交易详情
-    const tx = await provider.connection.getTransaction(txSignature, {
+    // Query the key-value pair
+    const queryTx = await program.methods.query().accounts({
+      data: dataAccount.publicKey,
+    }).rpc();
+
+    // Wait for transaction confirmation
+    await provider.connection.confirmTransaction({
+      signature: queryTx,
+      blockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+      lastValidBlockHeight: (await provider.connection.getLatestBlockhash()).lastValidBlockHeight,
+    });
+
+    // Add a small delay to ensure transaction is processed
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Get transaction details
+    const tx = await provider.connection.getTransaction(queryTx, {
       maxSupportedTransactionVersion: 0,
       commitment: "confirmed"
     });
@@ -40,12 +57,12 @@ describe("d-storage-app", () => {
       throw new Error("Transaction not found");
     }
 
-    // 调试输出
+    // Debug output
     console.log("Program logs:", tx.meta.logMessages);
 
-    // 断言验证
+    // Assert verification
     expect(tx.meta.logMessages).to.satisfy((logs: string[]) =>
-      logs.some(log => log.includes("Greetings from"))
+      logs.some(log => log.includes(`Query result: ${key} = ${value}`))
     );
   });
 });
