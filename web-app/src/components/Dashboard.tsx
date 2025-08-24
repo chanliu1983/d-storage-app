@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { 
   TrendingUp, 
@@ -41,12 +41,21 @@ interface ExchangeStats {
   totalTransactions: number;
 }
 
+interface UserToken {
+  mint: string;
+  balance: number;
+  totalValue?: number;
+  symbol?: string;
+  name?: string;
+  change24h?: number;
+}
+
 const Dashboard: React.FC = () => {
   const { connection } = useConnection();
   const { publicKey, wallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [exchangeTokens, setExchangeTokens] = useState<ExchangeToken[]>([]);
-  const [userTokens, setUserTokens] = useState<any[]>([]);
+  const [userTokens, setUserTokens] = useState<UserToken[]>([]);
   const [transactions, setTransactions] = useState<ExchangeTransaction[]>([]);
   const [exchangeStats, setExchangeStats] = useState<ExchangeStats>({
     totalValue: 0,
@@ -60,13 +69,7 @@ const Dashboard: React.FC = () => {
 
   const blockchainService = new BlockchainDataService(connection);
 
-  useEffect(() => {
-    if (publicKey) {
-      loadExchangeData();
-    }
-  }, [publicKey]);
-
-  const loadExchangeData = async () => {
+  const loadExchangeData = useCallback(async () => {
     if (!publicKey) return;
     
     setIsLoading(true);
@@ -76,13 +79,13 @@ const Dashboard: React.FC = () => {
         blockchainService.getExchangeTokens(),
         blockchainService.getRecentTransactions(),
         blockchainService.getExchangeStats(),
-        blockchainService.getUserTokenBalances(publicKey, wallet)
+        blockchainService.getUserTokenBalances(publicKey, wallet!)
       ]);
       
       setUserTokens(userTokensData);
       
-      const tokensWithUserBalances = exchangeTokensData.map((token: any) => {
-        const userBalance = userTokensData.find((balance: any) => balance.mint === token.mint);
+      const tokensWithUserBalances = exchangeTokensData.map((token: ExchangeToken) => {
+        const userBalance = userTokensData.find((balance: {mint: string; balance: number}) => balance.mint === token.mint);
         return {
           ...token,
           userBalance: userBalance?.balance || 0,
@@ -94,10 +97,10 @@ const Dashboard: React.FC = () => {
       setTransactions(transactionsData);
       setExchangeStats(exchangeStatsData);
       
-      const userPortfolioValue = userTokensData.reduce((sum: number, token: any) => sum + (token.totalValue || 0), 0);
+      const userPortfolioValue = userTokensData.reduce((sum: number, token: {totalValue?: number}) => sum + (token.totalValue || 0), 0);
       setPortfolioValue(userPortfolioValue);
       
-      const solBalance = userTokensData.find((balance: any) => balance.mint === 'SOL')?.balance || 0;
+      const solBalance = userTokensData.find((balance: {mint: string; balance: number}) => balance.mint === 'SOL')?.balance || 0;
       setUserBalance(solBalance);
       
       const randomChange = (Math.random() - 0.5) * 10;
@@ -122,7 +125,13 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [publicKey, wallet, connection]);
+
+  useEffect(() => {
+    if (publicKey) {
+      loadExchangeData();
+    }
+  }, [publicKey, loadExchangeData]);
 
   const formatNumber = (num: number) => {
     if (num >= 1e9) {
@@ -299,12 +308,12 @@ const Dashboard: React.FC = () => {
                                 <div className="flex items-center space-x-3">
                                   <div className="w-10 h-10 bg-gradient-to-r from-blue-400 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                                     <span className="text-white font-bold text-sm">
-                                      {token.symbol.charAt(0)}
+                                      {token.symbol?.charAt(0) || 'T'}
                                     </span>
                                   </div>
                                   <div>
-                                    <p className="font-semibold text-white">{token.symbol}</p>
-                                    <p className="text-sm text-white/60">{token.name}</p>
+                                    <p className="font-semibold text-white">{token.symbol || 'Unknown'}</p>
+                                    <p className="text-sm text-white/60">{token.name || 'Unknown Token'}</p>
                                   </div>
                                 </div>
                               </td>
@@ -327,11 +336,11 @@ const Dashboard: React.FC = () => {
                               </td>
                               <td className="text-right py-4">
                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                                  token.change24h >= 0 
+                                  (token.change24h || 0) >= 0 
                                     ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
                                     : 'bg-red-500/20 text-red-300 border border-red-500/30'
                                 }`}>
-                                  {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(1)}%
+                                  {(token.change24h || 0) >= 0 ? '+' : ''}{(token.change24h || 0).toFixed(1)}%
                                 </span>
                               </td>
                             </tr>

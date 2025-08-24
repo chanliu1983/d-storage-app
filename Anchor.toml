@@ -15,7 +15,8 @@ flexible_token_exchange = "AGrFZZYRCctZB1mpq3bCdMP34DMmb6afdrw2eSCoZ2gz"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
+url = "https://rpc.ankr.com/solana_devnet"
 wallet = "./bosj4sevzHejo3ueZnSa7gdm1D44WCRD54kJZPYf3RX.json"
 
 [scripts]

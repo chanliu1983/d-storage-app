@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { toast } from 'sonner';
@@ -35,8 +35,8 @@ interface PoolInfo {
 
 const TradingInterface: React.FC = () => {
   const { connection } = useConnection();
-  const { connected, publicKey, wallet } = useWallet();
-  const blockchainDataService = new BlockchainDataService(connection);
+  const { connected, publicKey, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet();
+  const blockchainDataService = useMemo(() => new BlockchainDataService(connection), [connection]);
   const [isSwapping, setIsSwapping] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState<'idle' | 'preparing' | 'signing' | 'confirming' | 'confirmed' | 'failed'>('idle');
   const [availableTokens, setAvailableTokens] = useState<TokenInfo[]>([]);
@@ -52,7 +52,7 @@ const TradingInterface: React.FC = () => {
     toToken: '',
     fromAmount: 1,
     toAmount: 0,
-    slippage: 1.0
+    slippage: 5.0
   });
 
   // Load tokens from tokenRegistry
@@ -73,8 +73,13 @@ const TradingInterface: React.FC = () => {
         
         // Filter tokens to only show those with existing liquidity pools
         if (connected && wallet) {
-          const tokensWithPools = await blockchainDataService.getTokensWithPools(tokensWithTradingData, wallet);
-          setAvailableTokens(tokensWithPools);
+          const walletInput = { adapter: wallet.adapter };
+          const tokensWithPools = await blockchainDataService.getTokensWithPools(tokensWithTradingData, walletInput);
+          // Convert the simplified tokens back to full TokenInfo objects
+          const filteredTokens = tokensWithTradingData.filter(token => 
+            tokensWithPools.some(poolToken => poolToken.mint === token.mint)
+          );
+          setAvailableTokens(filteredTokens);
         } else {
           // If no wallet connected, show all tokens (fallback behavior)
           setAvailableTokens(tokensWithTradingData);
@@ -87,7 +92,7 @@ const TradingInterface: React.FC = () => {
     };
     
     loadTokens();
-  }, [connected, wallet]);
+  }, [connected, wallet, blockchainDataService]);
   
   // Helper function to get default prices for demo
   const getDefaultPrice = (symbol: string): number => {
@@ -151,8 +156,30 @@ const TradingInterface: React.FC = () => {
   };
 
   const calculateMinReceived = () => {
-    const slippageMultiplier = (100 - form.slippage) / 100;
-    return (form.toAmount * slippageMultiplier).toFixed(6);
+    if (!poolInfo.tokenReserve || !poolInfo.solReserve || form.fromAmount <= 0) {
+      // Fallback to simple calculation if pool data not available
+      const slippageMultiplier = (100 - form.slippage) / 100;
+      const safetyBuffer = 0.97; // Same 3% safety buffer as in executeSwap
+      return (form.toAmount * slippageMultiplier * safetyBuffer).toFixed(6);
+    }
+    
+    // Use AMM formula to calculate expected tokens
+    const feeRate = poolInfo.feeRate || 0;
+    const solAmountAfterFee = form.fromAmount * (10000 - feeRate) / 10000;
+    
+    // AMM constant product formula: token_out = (token_reserve * sol_amount_after_fee) / (sol_reserve + sol_amount_after_fee)
+    const solAmountInLamports = solAmountAfterFee * 1e9;
+    const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, 6);
+    const solReserveRaw = poolInfo.solReserve * 1e9;
+    
+    const tokenAmountOut = (tokenReserveRaw * solAmountInLamports) / (solReserveRaw + solAmountInLamports);
+    const expectedTokens = tokenAmountOut / Math.pow(10, 6);
+    
+    // Apply slippage with safety buffer (same as executeSwap)
+    const slippageMultiplier = (1 - form.slippage / 100);
+    const safetyBuffer = 0.97; // Additional 3% safety buffer
+    const minTokens = expectedTokens * slippageMultiplier * safetyBuffer;
+    return minTokens.toFixed(6);
   };
 
   const executeSwap = async () => {
@@ -178,8 +205,74 @@ const TradingInterface: React.FC = () => {
     setTransactionStatus('preparing');
     
     try {
-      // Calculate minimum tokens to receive based on slippage
-      const minTokenAmount = form.toAmount * (1 - form.slippage / 100);
+      // Calculate minimum tokens to receive based on slippage and fee rate
+      // First, account for the fee that will be deducted from SOL input
+      const feeRate = poolInfo.feeRate || 0; // Default to 0 if no fee rate
+      const solAmountAfterFee = form.fromAmount * (10000 - feeRate) / 10000;
+      
+      // Calculate expected tokens using AMM constant product formula
+      // token_out = (token_reserve * sol_amount_after_fee) / (sol_reserve + sol_amount_after_fee)
+      let expectedTokensAfterFee;
+      if (poolInfo.tokenReserve && poolInfo.solReserve) {
+        // Use AMM formula with actual pool reserves
+        const solAmountInLamports = solAmountAfterFee * 1e9; // Convert SOL to lamports
+        const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, 6); // Convert to raw token units
+        const solReserveRaw = poolInfo.solReserve * 1e9; // Convert to lamports
+        
+        const tokenAmountOut = (tokenReserveRaw * solAmountInLamports) / (solReserveRaw + solAmountInLamports);
+        expectedTokensAfterFee = tokenAmountOut / Math.pow(10, 6); // Convert back to token units
+      } else {
+        // Fallback to simple price calculation if pool data not available
+        expectedTokensAfterFee = selectedToken?.price ? solAmountAfterFee / selectedToken.price : form.toAmount;
+      }
+      
+      // Apply slippage to the AMM-calculated expected amount with additional safety buffer
+      const slippageMultiplier = (1 - form.slippage / 100);
+      const safetyBuffer = 0.97; // Additional 3% safety buffer to prevent SlippageExceeded
+      const minTokenAmount = expectedTokensAfterFee * slippageMultiplier * safetyBuffer;
+      
+      // Debug logging for price comparison
+      console.log('=== Price Debug Information ===');
+      console.log('1. selectedToken:', selectedToken);
+      console.log('2. selectedToken.price:', selectedToken?.price);
+      console.log('3. form.fromAmount:', form.fromAmount);
+      console.log('4. form.toAmount (calculated):', form.toAmount);
+      console.log('5. poolInfo.price (actual pool price):', poolInfo.price);
+      console.log('6. poolInfo.feeRate:', feeRate);
+      console.log('7. solAmountAfterFee:', solAmountAfterFee);
+      console.log('8. expectedTokensAfterFee:', expectedTokensAfterFee);
+      console.log('9. minTokenAmount (with slippage + safety buffer):', minTokenAmount);
+      console.log('9a. slippageMultiplier:', slippageMultiplier);
+      console.log('9b. safetyBuffer:', safetyBuffer);
+      console.log('9c. minTokenAmount calculation: expectedTokensAfterFee * slippageMultiplier * safetyBuffer =', expectedTokensAfterFee, '*', slippageMultiplier, '*', safetyBuffer, '=', minTokenAmount);
+      console.log('10. slippage:', form.slippage);
+      
+      if (selectedToken?.price && poolInfo.price) {
+        const priceDifference = Math.abs(selectedToken.price - poolInfo.price);
+        const priceDifferencePercent = (priceDifference / poolInfo.price) * 100;
+        console.log('11. Price difference (absolute):', priceDifference);
+        console.log('12. Price difference (%):', priceDifferencePercent.toFixed(2) + '%');
+        console.log('13. Frontend expects tokens (simple price):', form.fromAmount / selectedToken.price);
+        console.log('14. Frontend expects tokens (AMM formula):', expectedTokensAfterFee);
+        console.log('15. Pool reserves - SOL:', poolInfo.solReserve, 'Token:', poolInfo.tokenReserve);
+        console.log('16. AMM calculation details:', {
+          solAmountAfterFee,
+          tokenReserve: poolInfo.tokenReserve,
+          solReserve: poolInfo.solReserve,
+          expectedOutput: expectedTokensAfterFee
+        });
+      }
+      console.log('==============================');
+      
+      // Log the exact parameters being sent to the contract
+      console.log('=== CONTRACT PARAMETERS ===');
+      console.log('tokenMint:', form.toToken);
+      console.log('solAmount:', form.fromAmount);
+      console.log('minTokenAmount (final):', minTokenAmount);
+      console.log('minTokenAmount (raw units):', minTokenAmount * Math.pow(10, 6));
+      console.log('publicKey:', publicKey?.toString());
+      console.log('wallet connected:', !!wallet);
+      console.log('===========================');
       
       toast.info('Preparing transaction...');
       setTransactionStatus('signing');
@@ -189,8 +282,8 @@ const TradingInterface: React.FC = () => {
         form.toToken,
         form.fromAmount,
         minTokenAmount,
-        wallet,
-        publicKey
+        { ...(wallet ?? {}), sendTransaction, signTransaction, signAllTransactions, publicKey },
+        publicKey as PublicKey
       );
       
       if (swapResult.signature) {
@@ -222,7 +315,7 @@ const TradingInterface: React.FC = () => {
           toToken: '',
           fromAmount: 1,
           toAmount: 0,
-          slippage: 1.0
+          slippage: 5.0
         });
         
         toast.success(
@@ -234,7 +327,7 @@ const TradingInterface: React.FC = () => {
           // Refresh user token balances to reflect the swap
           setTimeout(async () => {
             try {
-              await blockchainDataService.getUserTokenBalances(publicKey, wallet);
+              await blockchainDataService.getUserTokenBalances(publicKey, wallet ?? undefined);
               console.log('User balances refreshed after successful swap');
             } catch (error) {
               console.error('Error refreshing user balances:', error);
@@ -265,7 +358,7 @@ const TradingInterface: React.FC = () => {
   };
 
   // Function to check liquidity pool for a specific token
-  const checkLiquidityPool = async (tokenMint: string, autoSelect: boolean = false) => {
+  const checkLiquidityPool = useCallback(async (tokenMint: string, autoSelect: boolean = false) => {
     if (!tokenMint || !connected || !wallet) {
       setPoolInfo({ exists: false, loading: false });
       return;
@@ -278,7 +371,7 @@ const TradingInterface: React.FC = () => {
       let tokenMintPubkey: PublicKey;
       try {
         tokenMintPubkey = new PublicKey(tokenMint);
-      } catch (error) {
+      } catch {
         setPoolInfo({ 
           exists: false, 
           loading: false, 
@@ -288,11 +381,12 @@ const TradingInterface: React.FC = () => {
       }
 
       // Check if pool exists
-      const hasPool = await blockchainDataService.hasLiquidityPool(tokenMint, wallet);
+      const walletInput = wallet ? { adapter: wallet.adapter } : undefined;
+      const hasPool = await blockchainDataService.hasLiquidityPool(tokenMint, walletInput);
       
       if (hasPool) {
         // Get detailed pool data
-        const program = blockchainDataService['initializeProgram'](wallet);
+        const program = blockchainDataService['initializeProgram'](walletInput);
         const poolData = await blockchainDataService['getPoolData'](program, tokenMintPubkey);
         
         if (poolData) {
@@ -366,7 +460,7 @@ const TradingInterface: React.FC = () => {
         error: 'Error checking liquidity pool: ' + (error as Error).message 
       });
     }
-  };
+  }, [connected, wallet, blockchainDataService]);
 
   // Check pool when token selection changes
   useEffect(() => {
@@ -375,7 +469,7 @@ const TradingInterface: React.FC = () => {
     } else {
       setPoolInfo({ exists: false, loading: false });
     }
-  }, [form.toToken, connected, wallet]);
+  }, [form.toToken, checkLiquidityPool]);
 
   // Handle custom token input
   const handleCustomTokenCheck = () => {

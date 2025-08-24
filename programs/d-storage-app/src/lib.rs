@@ -17,6 +17,9 @@ pub mod flexible_token_exchange {
         initial_sol_amount: u64,
         fee_rate: u16,
     ) -> Result<()> {
+        // Validate fee rate
+        require!(fee_rate <= 1000, ExchangeError::InvalidFeeRate); // Max 10%
+        
         let pool = &mut ctx.accounts.pool;
         pool.token_mint = ctx.accounts.token_mint.key();
         pool.token_vault = ctx.accounts.token_vault.key();
@@ -148,7 +151,12 @@ pub mod flexible_token_exchange {
         token_amount: u64,
         min_sol_amount: u64,
     ) -> Result<()> {
+        // Get values before any borrows
+        let token_mint = ctx.accounts.pool.token_mint;
         let pool = &mut ctx.accounts.pool;
+        
+        // Validate fee rate (defensive programming)
+        require!(pool.fee_rate <= 1000, ExchangeError::InvalidFeeRate);
         
         // Calculate SOL output using constant product formula (x * y = k)
         let token_reserve = pool.token_reserve;
@@ -185,7 +193,7 @@ pub mod flexible_token_exchange {
                     from: ctx.accounts.sol_vault.to_account_info(),
                     to: ctx.accounts.user.to_account_info(),
                 },
-                &[&[b"sol_vault", &[sol_vault_bump]]],
+                &[&[b"sol_vault", token_mint.as_ref(), &[sol_vault_bump]]],
             ),
             sol_amount_out,
         )?;
@@ -212,11 +220,12 @@ pub mod flexible_token_exchange {
         min_token_amount: u64,
     ) -> Result<()> {
         // Get values before any borrows
-        let pool_bump = ctx.bumps.pool;
-        let token_mint = ctx.accounts.pool.token_mint;
         let token_reserve = ctx.accounts.pool.token_reserve;
         let sol_reserve = ctx.accounts.pool.sol_reserve;
         let fee_rate = ctx.accounts.pool.fee_rate;
+        
+        // Validate fee rate (defensive programming)
+        require!(fee_rate <= 1000, ExchangeError::InvalidFeeRate);
         
         // Apply fee
         let sol_amount_after_fee = sol_amount * (10000 - fee_rate as u64) / 10000;
@@ -228,15 +237,17 @@ pub mod flexible_token_exchange {
         require!(token_amount_out < token_reserve, ExchangeError::InsufficientLiquidity);
         
         // Transfer tokens from vault to user
+        let pool_authority_bump = ctx.bumps.pool_authority;
+        let token_mint = ctx.accounts.pool.token_mint;
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
                     from: ctx.accounts.token_vault.to_account_info(),
                     to: ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.pool.to_account_info(),
+                    authority: ctx.accounts.pool_authority.to_account_info(),
                 },
-                &[&[b"pool", &[pool_bump]]],
+                &[&[b"pool_authority", token_mint.as_ref(), &[pool_authority_bump]]],
             ),
             token_amount_out,
         )?;
@@ -307,6 +318,7 @@ pub mod flexible_token_exchange {
         
         // Transfer SOL from vault to user
         if sol_amount > 0 {
+            let token_mint = ctx.accounts.pool.token_mint;
             anchor_lang::system_program::transfer(
                 CpiContext::new_with_signer(
                     ctx.accounts.system_program.to_account_info(),
@@ -314,7 +326,7 @@ pub mod flexible_token_exchange {
                         from: ctx.accounts.sol_vault.to_account_info(),
                         to: ctx.accounts.user.to_account_info(),
                     },
-                    &[&[b"sol_vault", &[ctx.bumps.sol_vault]]],
+                    &[&[b"sol_vault", token_mint.as_ref(), &[ctx.bumps.sol_vault]]],
                 ),
                 sol_amount,
             )?;
@@ -344,7 +356,28 @@ pub mod flexible_token_exchange {
             pool: pool.key(),
             old_fee_rate,
             new_fee_rate,
-            updated_by: ctx.accounts.authority.key(),
+            updated_by: ctx.accounts.pool_authority.key(),
+        });
+        
+        Ok(())
+    }
+
+    /// Update pool fee rate using PDA authority (for automated fixes)
+    pub fn update_pool_fee_pda(
+        ctx: Context<UpdatePoolFeePda>,
+        new_fee_rate: u16,
+    ) -> Result<()> {
+        require!(new_fee_rate <= 1000, ExchangeError::InvalidFeeRate); // Max 10%
+        
+        let pool = &mut ctx.accounts.pool;
+        let old_fee_rate = pool.fee_rate;
+        pool.fee_rate = new_fee_rate;
+        
+        emit!(FeeUpdateEvent {
+            pool: pool.key(),
+            old_fee_rate,
+            new_fee_rate,
+            updated_by: ctx.accounts.pool_authority.key(),
         });
         
         Ok(())
@@ -489,7 +522,8 @@ pub struct SwapTokenToSol<'info> {
     #[account(
         mut,
         seeds = [b"pool", pool.token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = pool.fee_rate <= 1000 @ ExchangeError::InvalidFeeRate
     )]
     pub pool: Account<'info, LiquidityPool>,
     #[account(mut)]
@@ -522,7 +556,8 @@ pub struct SwapSolToToken<'info> {
     #[account(
         mut,
         seeds = [b"pool", pool.token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = pool.fee_rate <= 1000 @ ExchangeError::InvalidFeeRate
     )]
     pub pool: Account<'info, LiquidityPool>,
     #[account(mut)]
@@ -533,6 +568,12 @@ pub struct SwapSolToToken<'info> {
         associated_token::authority = user
     )]
     pub user_token_account: Account<'info, TokenAccount>,
+    /// CHECK: Pool authority PDA
+    #[account(
+        seeds = [b"pool_authority", pool.token_mint.key().as_ref()],
+        bump
+    )]
+    pub pool_authority: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"token_vault", pool.token_mint.key().as_ref()],
@@ -593,10 +634,30 @@ pub struct UpdatePoolFee<'info> {
         bump
     )]
     pub pool: Account<'info, LiquidityPool>,
+    /// CHECK: Pool authority PDA
     #[account(
-        constraint = authority.key() == pool.pool_authority @ ExchangeError::Unauthorized
+        seeds = [b"pool_authority", pool.token_mint.key().as_ref()],
+        bump,
+        constraint = pool_authority.key() == pool.pool_authority @ ExchangeError::Unauthorized
     )]
-    pub authority: Signer<'info>,
+    pub pool_authority: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdatePoolFeePda<'info> {
+    #[account(
+        mut,
+        seeds = [b"pool", pool.token_mint.key().as_ref()],
+        bump
+    )]
+    pub pool: Account<'info, LiquidityPool>,
+    /// CHECK: Pool authority PDA
+    #[account(
+        seeds = [b"pool_authority", pool.token_mint.key().as_ref()],
+        bump,
+        constraint = pool_authority.key() == pool.pool_authority @ ExchangeError::Unauthorized
+    )]
+    pub pool_authority: AccountInfo<'info>,
 }
 
 

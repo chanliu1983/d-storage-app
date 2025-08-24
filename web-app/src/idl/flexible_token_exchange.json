@@ -845,6 +845,37 @@
           }
         },
         {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_mint",
+                "account": "LiquidityPool"
+              }
+            ]
+          }
+        },
+        {
           "name": "token_vault",
           "writable": true,
           "pda": {
@@ -1169,8 +1200,112 @@
           }
         },
         {
-          "name": "authority",
-          "signer": true
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_mint",
+                "account": "LiquidityPool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_rate",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "update_pool_fee_pda",
+      "docs": [
+        "Update pool fee rate using PDA authority (for automated fixes)"
+      ],
+      "discriminator": [
+        2,
+        46,
+        3,
+        253,
+        189,
+        150,
+        18,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_mint",
+                "account": "LiquidityPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_mint",
+                "account": "LiquidityPool"
+              }
+            ]
+          }
         }
       ],
       "args": [

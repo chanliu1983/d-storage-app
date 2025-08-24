@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSearchParams } from 'react-router-dom';
-import { PublicKey, LAMPORTS_PER_SOL, Transaction, VersionedTransaction, TransactionMessage, Connection } from '@solana/web3.js';
+import { PublicKey, LAMPORTS_PER_SOL, Transaction, VersionedTransaction, TransactionMessage, Connection, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import type { Idl } from '@coral-xyz/anchor';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Loader2, Plus, Coins, BarChart3, Zap, ArrowRight } from 'lucide-react';
 import idl from '../idl/flexible_token_exchange.json';
 import type { FlexibleTokenExchange } from '../types/flexible_token_exchange';
@@ -84,13 +84,14 @@ const LiquidityPool: React.FC = () => {
 
   const provider = useMemo(() => {
     if (!publicKey || !signTransaction) return null;
-    return new AnchorProvider(connection, {
+    const wallet = {
       publicKey,
       signTransaction,
-      signAllTransactions: async (transactions: Transaction[]) => {
-        return transactions.map((tx: Transaction) => signTransaction(tx));
+      signAllTransactions: async <T extends Transaction | VersionedTransaction>(transactions: T[]): Promise<T[]> => {
+        return Promise.all(transactions.map((tx: T) => signTransaction(tx)));
       },
-    } as any, {
+    };
+    return new AnchorProvider(connection, wallet, {
       commitment: 'confirmed',
     });
   }, [connection, publicKey, signTransaction]);
@@ -202,8 +203,8 @@ const LiquidityPool: React.FC = () => {
           lamports: mintInfo.lamports,
           dataLength: mintInfo.data.length
         });
-      } catch (mintError: any) {
-        throw new Error(`Failed to verify token mint: ${mintError.message}`);
+      } catch (mintError: unknown) {
+        throw new Error(`Failed to verify token mint: ${mintError instanceof Error ? mintError.message : String(mintError)}`);
       }
       
       const [poolPda, poolBump] = getPoolPDA(tokenMint);
@@ -218,8 +219,8 @@ const LiquidityPool: React.FC = () => {
           throw new Error(`Pool for token ${selectedToken.symbol} already exists at ${poolPda.toString()}`);
         }
         console.log('Pool account does not exist yet - good for initialization');
-      } catch (poolError: any) {
-        if (poolError.message.includes('already exists')) {
+      } catch (poolError: unknown) {
+        if (poolError instanceof Error && poolError.message.includes('already exists')) {
           throw poolError;
         }
         // If it's not an "already exists" error, it's expected that the account doesn't exist yet
@@ -249,8 +250,8 @@ const LiquidityPool: React.FC = () => {
         if (availableTokens < requiredTokens) {
           throw new Error(`Insufficient token balance. Required: ${form.tokenAmount} ${selectedToken.symbol}, Available: ${availableTokens / Math.pow(10, selectedToken.decimals)} ${selectedToken.symbol}`);
         }
-      } catch (tokenError: any) {
-        if (tokenError.message.includes('could not find account')) {
+      } catch (tokenError: unknown) {
+        if (tokenError instanceof Error && tokenError.message.includes('could not find account')) {
           throw new Error(`Token account not found. Please ensure you have ${selectedToken.symbol} tokens in your wallet.`);
         }
         throw tokenError;
@@ -356,16 +357,32 @@ const LiquidityPool: React.FC = () => {
       const feeRate = 30;
       
       // Declare transaction variable in higher scope
-      let transaction: any;
+      let transaction: Transaction;
+      
+      // Calculate authority token account
+      const authorityTokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        publicKey
+      );
       
       // Try with explicit accounts first (most reliable)
       try {
         console.log('Attempting to initialize pool with explicit accounts...');
         const signature = await program.methods
           .initializePool(tokenAmountBN, solAmountBN, feeRate)
-          .accounts({
-            authority: publicKey,
+          .accountsPartial({
             tokenMint: tokenMint,
+            pool: poolPda,
+            authority: publicKey,
+            poolAuthority: poolAuthority,
+            tokenVault: tokenVault,
+            solVault: solVault,
+            lpMint: lpMint,
+            authorityTokenAccount: authorityTokenAccount,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            rent: SYSVAR_RENT_PUBKEY,
           })
           .rpc();
         
@@ -376,39 +393,27 @@ const LiquidityPool: React.FC = () => {
         // Refresh pool data
         await fetchPoolData();
         return;
-      } catch (explicitError: any) {
-        console.log('Explicit accounts method failed:', explicitError.message);
-        
-        // Try with automatic account resolution (Anchor should handle PDAs)
-        try {
-          console.log('Attempting with automatic account resolution...');
-          const signature = await program.methods
-            .initializePool(tokenAmountBN, solAmountBN, feeRate)
-            .accounts({
-              authority: publicKey,
-              tokenMint: tokenMint,
-            })
-            .rpc();
-          
-          console.log('Pool initialized successfully with signature:', signature);
-          setStatus('Pool initialized successfully!');
-          setLoading(false);
-          
-          // Refresh pool data
-          await fetchPoolData();
-          return;
-        } catch (autoError: any) {
-          console.log('Automatic resolution failed:', autoError.message);
-        }
+      } catch (explicitError: unknown) {
+        console.log('Explicit accounts method failed:', explicitError instanceof Error ? explicitError.message : String(explicitError));
       }
       
       // If RPC fails, fall back to transaction method with manual account resolution
       try {
       transaction = await program.methods
         .initializePool(tokenAmountBN, solAmountBN, feeRate)
-        .accounts({
-          authority: publicKey,
+        .accountsPartial({
           tokenMint: tokenMint,
+          pool: poolPda,
+          authority: publicKey,
+          poolAuthority: poolAuthority,
+          tokenVault: tokenVault,
+          solVault: solVault,
+          lpMint: lpMint,
+          authorityTokenAccount: authorityTokenAccount,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
         })
         .transaction();
       
@@ -459,16 +464,16 @@ const LiquidityPool: React.FC = () => {
           computeUnitsConsumed: simulationResult.value.unitsConsumed,
           logs: simulationResult.value.logs?.slice(-5) // Last 5 logs
         });
-      } catch (simError: any) {
+      } catch (simError: unknown) {
         console.error('Simulation error:', simError);
         
         // Provide more specific error messages for simulation failures
-        let simErrorMessage = simError.message;
-        if (simError.message?.includes('Invalid arguments')) {
+        let simErrorMessage = simError instanceof Error ? simError.message : String(simError);
+        if (simError instanceof Error && simError.message?.includes('Invalid arguments')) {
           simErrorMessage = 'Transaction validation failed due to invalid parameters. Please check your inputs.';
-        } else if (simError.message?.includes('insufficient funds')) {
+        } else if (simError instanceof Error && simError.message?.includes('insufficient funds')) {
           simErrorMessage = 'Insufficient funds for this transaction. Please check your SOL and token balances.';
-        } else if (simError.message?.includes('Account not found')) {
+        } else if (simError instanceof Error && simError.message?.includes('Account not found')) {
           simErrorMessage = 'Required account not found. Please ensure the token account exists.';
         }
         
@@ -489,46 +494,47 @@ const LiquidityPool: React.FC = () => {
           // Try different sending options based on retry count
           const sendOptions = retryCount === 0 ? {
             skipPreflight: false,
-            preflightCommitment: 'confirmed' as any,
+            preflightCommitment: 'confirmed' as const,
             maxRetries: 1
           } : {
             skipPreflight: true, // Skip preflight on retries
-            preflightCommitment: 'confirmed' as any,
+            preflightCommitment: 'confirmed' as const,
             maxRetries: 1
           };
           
           signature = await sendTransaction(transaction, connection, sendOptions);
           console.log('Transaction sent successfully, signature:', signature);
           break;
-        } catch (sendError: any) {
+        } catch (sendError: unknown) {
           retryCount++;
           console.warn(`Transaction send attempt ${retryCount} failed:`, sendError);
+          const sendErrorObj = sendError as Error & { name?: string; code?: number; stack?: string; error?: unknown; wallet?: unknown; transaction?: unknown };
           console.error('Send error details:', {
-            name: sendError.name,
-            message: sendError.message,
-            code: sendError.code,
-            stack: sendError.stack
+            name: sendErrorObj.name,
+            message: sendErrorObj.message,
+            code: sendErrorObj.code,
+            stack: sendErrorObj.stack
           });
           
           // Don't retry for user rejection or certain wallet errors
-          if (sendError.message?.includes('User rejected') || 
-              sendError.message?.includes('rejected') ||
-              sendError.message?.includes('denied') ||
-              sendError.name === 'WalletNotConnectedError' ||
-              sendError.code === 4001) { // User rejected request
+          if (sendErrorObj.message?.includes('User rejected') || 
+              sendErrorObj.message?.includes('rejected') ||
+              sendErrorObj.message?.includes('denied') ||
+              sendErrorObj.name === 'WalletNotConnectedError' ||
+              sendErrorObj.code === 4001) { // User rejected request
             throw sendError;
           }
           
           // Handle specific wallet adapter errors
-          if (sendError.name === 'WalletSendTransactionError') {
+          if (sendErrorObj.name === 'WalletSendTransactionError') {
             console.error('WalletSendTransactionError details:', {
-              originalError: sendError.error,
-              wallet: sendError.wallet,
-              transaction: sendError.transaction
+              originalError: sendErrorObj.error,
+              wallet: sendErrorObj.wallet,
+              transaction: sendErrorObj.transaction
             });
             
             // If it's an unexpected error, try alternative approach
-            if (sendError.message?.includes('Unexpected error') && retryCount < maxRetries) {
+            if (sendErrorObj.message?.includes('Unexpected error') && retryCount < maxRetries) {
               console.log('Trying alternative transaction sending approach...');
               
               try {
@@ -541,17 +547,17 @@ const LiquidityPool: React.FC = () => {
                 });
                 console.log('Alternative send method successful, signature:', signature);
                 break;
-              } catch (altError: any) {
+              } catch (altError: unknown) {
                 console.warn('Alternative send method also failed:', altError);
                 if (retryCount >= maxRetries) {
-                  throw new Error(`Both standard and alternative transaction sending failed. Last error: ${altError.message}`);
+                  throw new Error(`Both standard and alternative transaction sending failed. Last error: ${altError instanceof Error ? altError.message : String(altError)}`);
                 }
               }
             } else if (retryCount >= maxRetries) {
               throw sendError;
             }
           } else if (retryCount >= maxRetries) {
-            throw new Error(`Failed to send transaction after ${maxRetries} attempts: ${sendError.message}`);
+            throw new Error(`Failed to send transaction after ${maxRetries} attempts: ${sendErrorObj.message}`);
           }
           
           // Wait before retry
@@ -577,7 +583,7 @@ const LiquidityPool: React.FC = () => {
         setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000)
       );
       
-      const confirmation = await Promise.race([confirmationPromise, timeoutPromise]) as any;
+      const confirmation = await Promise.race([confirmationPromise, timeoutPromise]) as { value?: { err?: unknown } };
       
       if (confirmation.value?.err) {
         throw new Error(`Transaction failed on blockchain: ${JSON.stringify(confirmation.value.err)}`);
@@ -587,14 +593,14 @@ const LiquidityPool: React.FC = () => {
       setStatus(`Pool initialized successfully! Transaction: ${signature!}`);
       await fetchPoolData();
       
-    } catch (transactionError: any) {
+    } catch (transactionError: unknown) {
       console.error('Transaction method failed:', transactionError);
       throw transactionError;
     }
       
-  } catch (error: any) {
+  } catch (error: unknown) {
       console.error('Error initializing pool:', error);
-      const errorObj = error as any;
+      const errorObj = error as Error & { name?: string; code?: number; cause?: unknown };
       let errorMessage = errorObj.message || 'Unknown error occurred';
       
       // Handle specific wallet errors
@@ -648,7 +654,7 @@ const LiquidityPool: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, program, selectedToken, form.tokenAmount, form.solAmount, connected, getPoolPDA, getTokenVaultPDA, getSolVaultPDA, getLpMintPDA, connection, sendTransaction, signTransaction]);
+  }, [publicKey, program, selectedToken, form.tokenAmount, form.solAmount, connected, getPoolPDA, getTokenVaultPDA, getSolVaultPDA, getLpMintPDA, connection, sendTransaction, signTransaction, simulateAnyTransaction]);
 
   const fetchPoolData = useCallback(async () => {
     if (!program || !selectedToken) return;

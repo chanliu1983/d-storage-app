@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { Store, ShoppingCart, Coins, RefreshCw } from 'lucide-react';
@@ -81,14 +81,7 @@ const Exchange: React.FC = () => {
     }
   ];
 
-  useEffect(() => {
-    loadExchangeData();
-    if (publicKey) {
-      loadUserBalance();
-    }
-  }, [publicKey]);
-
-  const loadExchangeData = async () => {
+  const loadExchangeData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Simulate API call delay
@@ -100,9 +93,9 @@ const Exchange: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadUserBalance = async () => {
+  const loadUserBalance = useCallback(async () => {
     if (!publicKey) return;
     
     try {
@@ -111,7 +104,14 @@ const Exchange: React.FC = () => {
     } catch (error) {
       console.error('Error loading user balance:', error);
     }
-  };
+  }, [publicKey, connection]);
+
+  useEffect(() => {
+    loadExchangeData();
+    if (publicKey) {
+      loadUserBalance();
+    }
+  }, [publicKey, loadExchangeData, loadUserBalance]);
 
   const handleTokenSelect = (tokenMint: string) => {
     const token = exchangeTokens.find(t => t.mint === tokenMint);
