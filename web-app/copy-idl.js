@@ -24,13 +24,13 @@ if (!fs.existsSync(typesDir)) {
 }
 
 // Copy IDL file
-const idlSource = path.join(__dirname, '..', 'target', 'idl', 'd_storage_app.json');
-const idlDest = path.join(idlDir, 'd_storage_app.json');
+const idlSource = path.join(__dirname, '..', 'target', 'idl', 'flexible_token_exchange.json');
+const idlDest = path.join(idlDir, 'flexible_token_exchange.json');
 fs.copyFileSync(idlSource, idlDest);
 
 // Copy types file
-const typesSource = path.join(__dirname, '..', 'target', 'types', 'd_storage_app.ts');
-const typesDest = path.join(typesDir, 'd_storage_app.ts');
+const typesSource = path.join(__dirname, '..', 'target', 'types', 'flexible_token_exchange.ts');
+const typesDest = path.join(typesDir, 'flexible_token_exchange.ts');
 fs.copyFileSync(typesSource, typesDest);
 
-console.log('Successfully copied IDL and types to web-app/src/target/'); 
+console.log('Successfully copied flexible_token_exchange IDL and types to web-app/src/target/');

@@ -1,0 +1,888 @@
+import React, { useState, useEffect } from 'react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
+import { toast } from 'sonner';
+import { ArrowUpDown, TrendingUp, Clock, Zap, Search, RefreshCw, ChevronDown, Info, AlertCircle } from 'lucide-react';
+import { tokenRegistry, type TokenInfo as RegistryTokenInfo } from '../utils/tokenRegistry';
+import BlockchainDataService from '../utils/blockchainDataService';
+
+interface TokenInfo extends RegistryTokenInfo {
+  price: number; // Price in SOL
+  change24h: number;
+  volume24h: number;
+  liquidity: number;
+}
+
+interface SwapForm {
+  fromToken: 'SOL';
+  toToken: string;
+  fromAmount: number;
+  toAmount: number;
+  slippage: number;
+}
+
+interface PoolInfo {
+  exists: boolean;
+  tokenReserve?: number;
+  solReserve?: number;
+  lpSupply?: number;
+  feeRate?: number;
+  loading: boolean;
+  error?: string;
+  tokenMint?: string;
+  price?: number;
+}
+
+const TradingInterface: React.FC = () => {
+  const { connection } = useConnection();
+  const { connected, publicKey, wallet } = useWallet();
+  const blockchainDataService = new BlockchainDataService(connection);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [transactionStatus, setTransactionStatus] = useState<'idle' | 'preparing' | 'signing' | 'confirming' | 'confirmed' | 'failed'>('idle');
+  const [availableTokens, setAvailableTokens] = useState<TokenInfo[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showTokenDropdown, setShowTokenDropdown] = useState(false);
+  const [recentTrades, setRecentTrades] = useState<Array<{from: string, to: string, amount: number, tokensReceived?: number, timestamp: Date, signature?: string}>>([]);
+  const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [poolInfo, setPoolInfo] = useState<PoolInfo>({ exists: false, loading: false });
+  const [customTokenInput, setCustomTokenInput] = useState('');
+  
+  const [form, setForm] = useState<SwapForm>({
+    fromToken: 'SOL',
+    toToken: '',
+    fromAmount: 1,
+    toAmount: 0,
+    slippage: 1.0
+  });
+
+  // Load tokens from tokenRegistry
+  useEffect(() => {
+    const loadTokens = async () => {
+      try {
+        // Get popular tokens from registry
+        const popularTokens = await tokenRegistry.getPopularTokens();
+        
+        // Add trading-specific data to each token
+        const tokensWithTradingData: TokenInfo[] = popularTokens.map(token => ({
+          ...token,
+          price: getDefaultPrice(token.symbol), // Default prices
+          change24h: (Math.random() - 0.5) * 10, // Random change for demo
+          volume24h: Math.floor(Math.random() * 200000) + 50000, // Random volume
+          liquidity: Math.floor(Math.random() * 500000) + 100000 // Random liquidity
+        }));
+        
+        // Filter tokens to only show those with existing liquidity pools
+        if (connected && wallet) {
+          const tokensWithPools = await blockchainDataService.getTokensWithPools(tokensWithTradingData, wallet);
+          setAvailableTokens(tokensWithPools);
+        } else {
+          // If no wallet connected, show all tokens (fallback behavior)
+          setAvailableTokens(tokensWithTradingData);
+        }
+      } catch (error) {
+        console.error('Error loading tokens:', error);
+        // Fallback to empty array if loading fails
+        setAvailableTokens([]);
+      }
+    };
+    
+    loadTokens();
+  }, [connected, wallet]);
+  
+  // Helper function to get default prices for demo
+  const getDefaultPrice = (symbol: string): number => {
+    const priceMap: { [key: string]: number } = {
+      'USDC': 0.000045,
+      'USDT': 0.000045,
+      'SOL': 1.0,
+      'WSOL': 1.0,
+      'BONK': 0.00000002,
+      'CUSTOM': 0.0001 // Default price for custom token
+    };
+    return priceMap[symbol] || 0.0001; // Default fallback price
+  };
+
+  const filteredTokens = availableTokens.filter(token =>
+    token.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    token.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedToken = availableTokens.find(token => token.mint === form.toToken);
+
+  // Calculate output amount based on current price
+  useEffect(() => {
+    if (selectedToken && form.fromAmount > 0) {
+      const outputAmount = form.fromAmount / selectedToken.price;
+      setForm(prev => ({ ...prev, toAmount: Number(outputAmount.toFixed(6)) }));
+    } else {
+      setForm(prev => ({ ...prev, toAmount: 0 }));
+    }
+  }, [form.fromAmount, selectedToken]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'fromAmount' || name === 'toAmount' || name === 'slippage' ? Number(value) : value
+    }));
+  };
+
+  const refreshPrices = async () => {
+    setPriceRefreshing(true);
+    // Simulate price refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Add some random price fluctuation
+    setAvailableTokens(prev => prev.map(token => ({
+      ...token,
+      price: token.price * (0.98 + Math.random() * 0.04), // ±2% fluctuation
+      change24h: token.change24h + (Math.random() - 0.5) * 2
+    })));
+    
+    setPriceRefreshing(false);
+    toast.success('Prices refreshed');
+  };
+
+  const calculatePriceImpact = () => {
+    if (!selectedToken || form.fromAmount === 0) return 0;
+    // Simplified price impact calculation
+    const impact = (form.fromAmount / selectedToken.liquidity) * 100;
+    return Math.min(impact, 15); // Cap at 15%
+  };
+
+  const calculateMinReceived = () => {
+    const slippageMultiplier = (100 - form.slippage) / 100;
+    return (form.toAmount * slippageMultiplier).toFixed(6);
+  };
+
+  const executeSwap = async () => {
+    if (!publicKey) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!form.toToken || form.fromAmount <= 0) {
+      toast.error('Please select a token and enter a valid amount');
+      return;
+    }
+
+    const priceImpact = calculatePriceImpact();
+    if (priceImpact > 10) {
+      const confirmed = window.confirm(
+        `High price impact detected (${priceImpact.toFixed(2)}%). Are you sure you want to continue?`
+      );
+      if (!confirmed) return;
+    }
+
+    setIsSwapping(true);
+    setTransactionStatus('preparing');
+    
+    try {
+      // Calculate minimum tokens to receive based on slippage
+      const minTokenAmount = form.toAmount * (1 - form.slippage / 100);
+      
+      toast.info('Preparing transaction...');
+      setTransactionStatus('signing');
+      
+      // Execute real blockchain swap
+      const swapResult = await blockchainDataService.executeSwap(
+        form.toToken,
+        form.fromAmount,
+        minTokenAmount,
+        wallet,
+        publicKey
+      );
+      
+      if (swapResult.signature) {
+        setTransactionStatus('confirming');
+        toast.info('Transaction submitted, waiting for confirmation...');
+      }
+      
+      if (swapResult.success) {
+        // Get the token symbol for display
+        const tokenSymbol = selectedToken?.symbol || 
+          availableTokens.find(t => t.mint === form.toToken)?.symbol ||
+          `TOKEN_${form.toToken.slice(0, 8)}`;
+        
+        const newTrade = {
+          from: 'SOL',
+          to: tokenSymbol,
+          amount: form.fromAmount,
+          tokensReceived: swapResult.tokensReceived || form.toAmount,
+          timestamp: new Date(),
+          signature: swapResult.signature
+        };
+        
+        setTransactionStatus('confirmed');
+        setRecentTrades(prev => [newTrade, ...prev.slice(0, 4)]); // Keep last 5 trades
+        
+        // Reset form
+        setForm({
+          fromToken: 'SOL',
+          toToken: '',
+          fromAmount: 1,
+          toAmount: 0,
+          slippage: 1.0
+        });
+        
+        toast.success(
+          `Successfully swapped ${newTrade.amount} SOL for ${swapResult.tokensReceived?.toFixed(6) || form.toAmount} ${tokenSymbol}!`
+        );
+        
+        // Refresh user balances after successful swap
+        if (publicKey) {
+          // Refresh user token balances to reflect the swap
+          setTimeout(async () => {
+            try {
+              await blockchainDataService.getUserTokenBalances(publicKey, wallet);
+              console.log('User balances refreshed after successful swap');
+            } catch (error) {
+              console.error('Error refreshing user balances:', error);
+            }
+          }, 1000);
+        }
+      } else {
+        throw new Error(swapResult.error || 'Swap failed');
+      }
+      
+    } catch (error) {
+      console.error('Error executing swap:', error);
+      setTransactionStatus('failed');
+      toast.error(`Swap failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setIsSwapping(false);
+      // Reset transaction status after a delay to show the final state
+      setTimeout(() => {
+        setTransactionStatus('idle');
+      }, 2000);
+    }
+  };
+
+  const handleSwapDirection = () => {
+    // For now, this function is a placeholder since we only support SOL -> Token swaps
+    // In a full implementation, this would swap fromToken and toToken
+    toast.info('Swap direction feature coming soon!');
+  };
+
+  // Function to check liquidity pool for a specific token
+  const checkLiquidityPool = async (tokenMint: string, autoSelect: boolean = false) => {
+    if (!tokenMint || !connected || !wallet) {
+      setPoolInfo({ exists: false, loading: false });
+      return;
+    }
+
+    setPoolInfo({ exists: false, loading: true });
+
+    try {
+      // Validate the token mint address
+      let tokenMintPubkey: PublicKey;
+      try {
+        tokenMintPubkey = new PublicKey(tokenMint);
+      } catch (error) {
+        setPoolInfo({ 
+          exists: false, 
+          loading: false, 
+          error: 'Invalid token mint address format' 
+        });
+        return;
+      }
+
+      // Check if pool exists
+      const hasPool = await blockchainDataService.hasLiquidityPool(tokenMint, wallet);
+      
+      if (hasPool) {
+        // Get detailed pool data
+        const program = blockchainDataService['initializeProgram'](wallet);
+        const poolData = await blockchainDataService['getPoolData'](program, tokenMintPubkey);
+        
+        if (poolData) {
+          const tokenReserve = poolData.tokenReserve.toNumber() / Math.pow(10, 6); // Assuming 6 decimals
+          const solReserve = poolData.solReserve.toNumber() / 1e9; // Convert lamports to SOL
+          const lpSupply = poolData.lpSupply.toNumber() / Math.pow(10, 6);
+          const calculatedPrice = solReserve / tokenReserve; // Calculate price from reserves
+          
+          setPoolInfo({
+            exists: true,
+            loading: false,
+            tokenReserve,
+            solReserve,
+            lpSupply,
+            feeRate: poolData.feeRate,
+            tokenMint,
+            price: calculatedPrice
+          });
+
+          // Auto-select the token for swapping if requested
+          if (autoSelect) {
+            // Create a custom token object for the dropdown
+            const customToken: TokenInfo = {
+              mint: tokenMint,
+              symbol: `CUSTOM_${tokenMint.slice(0, 8)}`,
+              name: `Custom Token (${tokenMint.slice(0, 8)}...)`,
+              decimals: 6,
+              price: calculatedPrice,
+              change24h: 0,
+              volume24h: 0,
+              liquidity: solReserve * 2 // Rough estimate
+            };
+
+            // Add to available tokens if not already present
+            setAvailableTokens(prev => {
+              const exists = prev.find(token => token.mint === tokenMint);
+              if (!exists) {
+                return [customToken, ...prev];
+              }
+              return prev.map(token => 
+                token.mint === tokenMint 
+                  ? { ...token, price: calculatedPrice }
+                  : token
+              );
+            });
+
+            // Set as selected token
+            setForm(prev => ({ ...prev, toToken: tokenMint }));
+            setShowTokenDropdown(false);
+            toast.success('Custom token selected for swapping!');
+          }
+        } else {
+          setPoolInfo({ 
+            exists: false, 
+            loading: false, 
+            error: 'Pool data could not be retrieved' 
+          });
+        }
+      } else {
+        setPoolInfo({ 
+          exists: false, 
+          loading: false, 
+          error: 'No liquidity pool found for this token' 
+        });
+      }
+    } catch (error) {
+      console.error('Error checking liquidity pool:', error);
+      setPoolInfo({ 
+        exists: false, 
+        loading: false, 
+        error: 'Error checking liquidity pool: ' + (error as Error).message 
+      });
+    }
+  };
+
+  // Check pool when token selection changes
+  useEffect(() => {
+    if (form.toToken) {
+      checkLiquidityPool(form.toToken);
+    } else {
+      setPoolInfo({ exists: false, loading: false });
+    }
+  }, [form.toToken, connected, wallet]);
+
+  // Handle custom token input
+  const handleCustomTokenCheck = () => {
+    if (customTokenInput.trim()) {
+      checkLiquidityPool(customTokenInput.trim());
+    }
+  };
+
+  // Handle using custom token for swap
+  const handleUseCustomTokenForSwap = () => {
+    if (customTokenInput.trim() && poolInfo.exists) {
+      checkLiquidityPool(customTokenInput.trim(), true);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      {/* Header Section */}
+      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-3">
+              Trading Interface
+            </h1>
+            <p className="text-white/70 text-lg">
+              Swap SOL for any available token with real-time pricing.
+            </p>
+          </div>
+          <button
+            onClick={refreshPrices}
+            disabled={priceRefreshing}
+            className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/30 text-white rounded-2xl hover:bg-gradient-to-r hover:from-blue-500/30 hover:to-purple-500/30 disabled:opacity-50 transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm"
+          >
+            <RefreshCw className={`h-5 w-5 ${priceRefreshing ? 'animate-spin' : ''}`} />
+            <span className="font-semibold">Refresh Prices</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Swap Interface */}
+        <div className="lg:col-span-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-white/20 to-white/10 p-8 border-b border-white/20">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <ArrowUpDown className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">
+                Swap Tokens
+              </h2>
+            </div>
+          </div>
+
+          <div className="p-8">
+
+            <div className="space-y-8">
+              {/* From Token (SOL) */}
+              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
+                <label className="block text-sm font-semibold text-white/80 mb-4">
+                  From
+                </label>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      name="fromAmount"
+                      value={form.fromAmount}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="0.000001"
+                      className="w-full px-4 py-4 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
+                    <span className="font-bold text-white text-lg">SOL</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Swap Direction Indicator */}
+              <div className="flex justify-center">
+                <button
+                  onClick={handleSwapDirection}
+                  className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 backdrop-blur-sm border border-white/20"
+                >
+                  <ArrowUpDown className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* To Token */}
+              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
+                <label className="block text-sm font-semibold text-white/80 mb-4">
+                  To
+                </label>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      name="toAmount"
+                      value={form.toAmount}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="0.000001"
+                      className="w-full px-4 py-4 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
+                      placeholder="0.0"
+                      readOnly
+                    />
+                  </div>
+                  <div className="relative">
+                    <button
+                       onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                       className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
+                     >
+                       {form.toToken ? (
+                         <>
+                           <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
+                           <div className="flex flex-col">
+                             <span className="font-bold text-white text-sm">
+                               {selectedToken?.symbol || `CUSTOM`}
+                             </span>
+                             {!selectedToken?.symbol && (
+                               <span className="text-white/60 text-xs">
+                                 {form.toToken.slice(0, 8)}...
+                               </span>
+                             )}
+                           </div>
+                         </>
+                       ) : (
+                         <span className="text-white/70 font-medium">Select Token</span>
+                       )}
+                       <ChevronDown className="h-5 w-5 text-white/70" />
+                     </button>
+
+                     {/* Token Dropdown */}
+                     {showTokenDropdown && (
+                       <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                         <div className="p-4">
+                           <div className="relative mb-4">
+                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                             <input
+                               type="text"
+                               placeholder="Search tokens..."
+                               value={searchTerm}
+                               onChange={(e) => setSearchTerm(e.target.value)}
+                               className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                             />
+                           </div>
+                           <div className="space-y-2">
+                             {filteredTokens.map((token) => (
+                               <button
+                                 key={token.mint}
+                                 onClick={() => {
+                                   setForm(prev => ({ ...prev, toToken: token.mint }));
+                                   setShowTokenDropdown(false);
+                                 }}
+                                 className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-xl transition-all duration-200 text-left"
+                               >
+                                 <div className="flex items-center space-x-3">
+                                   <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full"></div>
+                                   <div>
+                                     <p className="font-bold text-white">{token.symbol}</p>
+                                     <p className="text-sm text-white/60">{token.name}</p>
+                                   </div>
+                                 </div>
+                                 <div className="text-right">
+                                   <p className="font-medium text-white">{token.price.toFixed(8)} SOL</p>
+                                   <p className={`text-xs ${
+                                     token.change24h >= 0 ? 'text-green-300' : 'text-red-300'
+                                   }`}>
+                                     {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
+                                   </p>
+                                 </div>
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               </div>
+
+              {/* Slippage Settings */}
+              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
+                <label className="block text-sm font-semibold text-white/80 mb-4">
+                  Slippage Tolerance (%)
+                </label>
+                <div className="flex items-center space-x-6">
+                  <input
+                    type="range"
+                    name="slippage"
+                    value={form.slippage}
+                    onChange={handleInputChange}
+                    min="0.1"
+                    max="5.0"
+                    step="0.1"
+                    className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                  <span className="text-lg font-bold text-white bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/30 px-4 py-2 rounded-xl backdrop-blur-sm min-w-[4rem] text-center">
+                    {form.slippage}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Custom Token Input Section */}
+              <div className="backdrop-blur-sm bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-white/20 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                  <Search className="h-5 w-5" />
+                  <span>Check Custom Token Pool</span>
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex space-x-3">
+                    <input
+                      type="text"
+                      value={customTokenInput}
+                      onChange={(e) => setCustomTokenInput(e.target.value)}
+                      placeholder="Enter token mint address (e.g., H8w8FMaZQu2DFPxMbouAyh7tMG5br7WC7gTz1EWJ54ZW)"
+                      className="flex-1 px-4 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400/50 backdrop-blur-sm transition-all duration-300"
+                    />
+                    <button
+                      onClick={handleCustomTokenCheck}
+                      disabled={!customTokenInput.trim() || poolInfo.loading}
+                      className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold"
+                    >
+                      {poolInfo.loading ? 'Checking...' : 'Check Pool'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Liquidity Pool Information */}
+              {(poolInfo.loading || poolInfo.exists || poolInfo.error) && (
+                <div className="backdrop-blur-sm bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                    <Info className="h-5 w-5" />
+                    <span>Liquidity Pool Information</span>
+                  </h3>
+                  
+                  {poolInfo.loading && (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                      <span className="ml-3 text-white/70">Checking liquidity pool...</span>
+                    </div>
+                  )}
+                  
+                  {poolInfo.exists && !poolInfo.loading && (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                        <span className="text-green-300 font-semibold">Liquidity Pool Found</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex justify-between items-center py-2 border-b border-white/10">
+                          <span className="text-white/70 font-medium">Token Reserve:</span>
+                          <span className="font-bold text-white">
+                            {poolInfo.tokenReserve?.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-white/10">
+                          <span className="text-white/70 font-medium">SOL Reserve:</span>
+                          <span className="font-bold text-white">
+                            {poolInfo.solReserve?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || '0'} SOL
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-white/10">
+                          <span className="text-white/70 font-medium">LP Supply:</span>
+                          <span className="font-bold text-white">
+                            {poolInfo.lpSupply?.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-white/10">
+                          <span className="text-white/70 font-medium">Fee Rate:</span>
+                          <span className="font-bold text-white">
+                            {poolInfo.feeRate ? (poolInfo.feeRate / 100).toFixed(2) : '0'}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-4 p-3 bg-green-500/20 border border-green-400/30 rounded-xl">
+                        <p className="text-green-300 text-sm mb-3">
+                          ✓ This token can be swapped. Pool has sufficient liquidity.
+                        </p>
+                        <button
+                          onClick={handleUseCustomTokenForSwap}
+                          className="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2"
+                        >
+                          <ArrowUpDown className="h-4 w-4" />
+                          <span>Use This Token for Swap</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {poolInfo.error && !poolInfo.loading && (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400" />
+                        <span className="text-red-300 font-semibold">Pool Check Result</span>
+                      </div>
+                      <div className="p-4 bg-red-500/20 border border-red-400/30 rounded-xl">
+                        <p className="text-red-300 text-sm mb-2">
+                          ⚠️ {poolInfo.error}
+                        </p>
+                        <p className="text-red-200 text-xs">
+                          This token cannot be swapped because no liquidity pool exists. You may need to create a liquidity pool first or check if the token mint address is correct.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Swap Details */}
+              {selectedToken && form.fromAmount > 0 && (
+                <div className="backdrop-blur-sm bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                    <TrendingUp className="h-5 w-5" />
+                    <span>Swap Details</span>
+                  </h3>
+                  <div className="space-y-4 text-sm">
+                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                      <span className="text-white/70 font-medium">Price:</span>
+                      <span className="font-bold text-white">
+                        1 {selectedToken.symbol} = {selectedToken.price.toFixed(8)} SOL
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                      <span className="text-white/70 font-medium">Price Impact:</span>
+                      <span className={`font-bold px-3 py-1 rounded-lg ${
+                        calculatePriceImpact() > 5 
+                          ? 'text-red-300 bg-red-500/20 border border-red-400/30' 
+                          : 'text-green-300 bg-green-500/20 border border-green-400/30'
+                      }`}>
+                        {calculatePriceImpact().toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-white/10">
+                      <span className="text-white/70 font-medium">Minimum Received:</span>
+                      <span className="font-bold text-white">
+                        {calculateMinReceived()} {selectedToken.symbol}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-white/70 font-medium">Liquidity:</span>
+                      <span className="font-bold text-white">
+                        {selectedToken.liquidity.toLocaleString()} SOL
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Swap Button */}
+              <button
+                onClick={executeSwap}
+                disabled={isSwapping || !publicKey || !form.toToken || form.fromAmount <= 0}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6 px-6 rounded-2xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 text-xl font-bold shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] transition-all duration-300 border border-white/20 backdrop-blur-sm"
+              >
+                {transactionStatus === 'preparing' && (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span>Preparing...</span>
+                  </>
+                )}
+                {transactionStatus === 'signing' && (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span>Sign Transaction</span>
+                  </>
+                )}
+                {transactionStatus === 'confirming' && (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span>Confirming...</span>
+                  </>
+                )}
+                {transactionStatus === 'confirmed' && (
+                  <>
+                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">✓</span>
+                    </div>
+                    <span>Success!</span>
+                  </>
+                )}
+                {transactionStatus === 'failed' && (
+                  <>
+                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">✗</span>
+                    </div>
+                    <span>Failed</span>
+                  </>
+                )}
+                {transactionStatus === 'idle' && (
+                  <>
+                    <Zap className="h-6 w-6" />
+                    <span>Swap Tokens</span>
+                  </>
+                )}
+              </button>
+          </div>
+          </div>
+        </div>
+
+        {/* Market Info & Recent Trades */}
+        <div className="space-y-8">
+          {/* Token Market Info */}
+          {selectedToken && (
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">
+                  {selectedToken.symbol} Market
+                </h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center py-3 border-b border-white/10">
+                  <span className="text-white/70 font-medium">Price:</span>
+                  <span className="font-bold text-white text-lg">
+                    {selectedToken.price.toFixed(8)} SOL
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b border-white/10">
+                  <span className="text-white/70 font-medium">24h Change:</span>
+                  <span className={`font-bold text-lg px-3 py-1 rounded-lg ${
+                    selectedToken.change24h >= 0 
+                      ? 'text-green-300 bg-green-500/20 border border-green-400/30' 
+                      : 'text-red-300 bg-red-500/20 border border-red-400/30'
+                  }`}>
+                    {selectedToken.change24h >= 0 ? '+' : ''}{selectedToken.change24h.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b border-white/10">
+                  <span className="text-white/70 font-medium">24h Volume:</span>
+                  <span className="font-bold text-white text-lg">
+                    {selectedToken.volume24h.toLocaleString()} SOL
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-3">
+                  <span className="text-white/70 font-medium">Liquidity:</span>
+                  <span className="font-bold text-white text-lg">
+                    {selectedToken.liquidity.toLocaleString()} SOL
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Trades */}
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-white">
+                Recent Trades
+              </h3>
+            </div>
+            {recentTrades.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gradient-to-br from-gray-400/20 to-gray-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Clock className="h-8 w-8 text-white/50" />
+                </div>
+                <p className="text-white/70 text-lg font-medium">
+                  No recent trades. Make your first swap!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentTrades.map((trade, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between py-4 px-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+                  >
+                    <div>
+                      <p className="text-lg font-bold text-white mb-1">
+                        {trade.amount} {trade.from} → {trade.tokensReceived ? trade.tokensReceived.toFixed(6) : 'N/A'} {trade.to}
+                      </p>
+                      <p className="text-sm text-white/60">
+                        {trade.timestamp.toLocaleTimeString()}
+                        {trade.signature && (
+                          <span className="ml-2 text-blue-300">
+                            • Tx: {trade.signature.slice(0, 8)}...
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="bg-gradient-to-r from-green-500/20 to-green-600/20 border border-green-400/30 text-green-300 text-sm font-bold px-4 py-2 rounded-xl">
+                      Success
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TradingInterface;
