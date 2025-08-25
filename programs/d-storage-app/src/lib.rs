@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("AGrFZZYRCctZB1mpq3bCdMP34DMmb6afdrw2eSCoZ2gz");
+declare_id!("HWHCbmSEp3V56MM7oVGYmdVLaFupSUUr9kpbfj2zAAuq");
 
 #[program]
 pub mod flexible_token_exchange {
@@ -19,6 +19,25 @@ pub mod flexible_token_exchange {
     ) -> Result<()> {
         // Validate fee rate
         require!(fee_rate <= 1000, ExchangeError::InvalidFeeRate); // Max 10%
+        
+        // Create SOL vault as System Program owned account
+        let sol_vault_bump = ctx.bumps.sol_vault;
+        let token_mint = ctx.accounts.token_mint.key();
+        let rent_exemption = Rent::get()?.minimum_balance(0);
+        
+        anchor_lang::system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::CreateAccount {
+                    from: ctx.accounts.authority.to_account_info(),
+                    to: ctx.accounts.sol_vault.to_account_info(),
+                },
+                &[&[b"sol_vault", token_mint.as_ref(), &[sol_vault_bump]]],
+            ),
+            rent_exemption + initial_sol_amount,
+            0,
+            &anchor_lang::system_program::ID,
+        )?;
         
         let pool = &mut ctx.accounts.pool;
         pool.token_mint = ctx.accounts.token_mint.key();
@@ -45,20 +64,6 @@ pub mod flexible_token_exchange {
                     },
                 ),
                 initial_token_amount,
-            )?;
-        }
-
-        // Transfer initial SOL from authority to vault
-        if initial_sol_amount > 0 {
-            anchor_lang::system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    anchor_lang::system_program::Transfer {
-                        from: ctx.accounts.authority.to_account_info(),
-                        to: ctx.accounts.sol_vault.to_account_info(),
-                    },
-                ),
-                initial_sol_amount,
             )?;
         }
 
@@ -302,15 +307,17 @@ pub mod flexible_token_exchange {
         
         // Transfer tokens from vault to user
         if token_amount > 0 {
+            let pool_authority_bump = ctx.bumps.pool_authority;
+            let token_mint = ctx.accounts.pool.token_mint;
             token::transfer(
                 CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
                     Transfer {
                         from: ctx.accounts.token_vault.to_account_info(),
                         to: ctx.accounts.user_token_account.to_account_info(),
-                        authority: ctx.accounts.pool.to_account_info(),
+                        authority: ctx.accounts.pool_authority.to_account_info(),
                     },
-                    &[&[b"pool", &[pool_bump]]],
+                    &[&[b"pool_authority", token_mint.as_ref(), &[pool_authority_bump]]],
                 ),
                 token_amount,
             )?;
@@ -451,11 +458,9 @@ pub struct InitializePool<'info> {
     )]
     pub token_vault: Account<'info, TokenAccount>,
     
-    /// CHECK: SOL vault is a PDA that will hold SOL
+    /// CHECK: SOL vault - will be created as System Program owned account
     #[account(
-        init,
-        payer = authority,
-        space = 0,
+        mut,
         seeds = [b"sol_vault", token_mint.key().as_ref()],
         bump
     )]
@@ -534,6 +539,12 @@ pub struct SwapTokenToSol<'info> {
         associated_token::authority = user
     )]
     pub user_token_account: Account<'info, TokenAccount>,
+    /// CHECK: Pool authority PDA
+    #[account(
+        seeds = [b"pool_authority", pool.token_mint.key().as_ref()],
+        bump
+    )]
+    pub pool_authority: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"token_vault", pool.token_mint.key().as_ref()],
@@ -607,6 +618,12 @@ pub struct RemoveLiquidity<'info> {
         associated_token::authority = user
     )]
     pub user_token_account: Account<'info, TokenAccount>,
+    /// CHECK: Pool authority PDA
+    #[account(
+        seeds = [b"pool_authority", pool.token_mint.key().as_ref()],
+        bump
+    )]
+    pub pool_authority: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"token_vault", pool.token_mint.key().as_ref()],

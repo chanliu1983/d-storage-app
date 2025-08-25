@@ -4,6 +4,7 @@ import {
   LAMPORTS_PER_SOL,
   Transaction,
   ComputeBudgetProgram,
+  SystemProgram,
   type BlockhashWithExpiryBlockHeight,
 } from "@solana/web3.js";
 import type { SendTransactionOptions } from "@solana/wallet-adapter-base";
@@ -90,7 +91,7 @@ export interface PoolData {
 class BlockchainDataService {
   private connection: Connection;
   private tokenCache = new Map<string, TokenInfo>();
-  private poolCache = new Map<string, PoolData>();
+  private poolCache = new Map<string, PoolData | null>();
   private lastCacheUpdate = 0;
   private readonly CACHE_DURATION = 30 * 1000; // 30 seconds
 
@@ -338,7 +339,13 @@ class BlockchainDataService {
 
       return poolData;
     } catch (error) {
-      console.warn(`Pool not found for token ${tokenMint.toString()}:`, error);
+      // Only log if it's not a "Account does not exist" error, which is expected for tokens without pools
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('Account does not exist')) {
+        console.warn(`Pool fetch error for token ${tokenMint.toString()}:`, error);
+      }
+      // Cache null result to avoid repeated failed fetches
+      this.poolCache.set(cacheKey, null);
       return null;
     }
   }
@@ -656,8 +663,6 @@ class BlockchainDataService {
         PROGRAM_ID
       );
 
-
-
       // Calculate user's associated token account using SPL token helper
       const TOKEN_PROGRAM_ID = new PublicKey(
         "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -871,7 +876,6 @@ class BlockchainDataService {
             pool: poolPda,
             user: userPublicKey,
             userTokenAccount: userTokenAccountPda,
-            poolAuthority: poolAuthorityPda,
             tokenVault: tokenVaultPda,
             solVault: solVaultPda,
             tokenProgram: TOKEN_PROGRAM_ID,
@@ -1277,16 +1281,315 @@ class BlockchainDataService {
     } catch (error: unknown) {
       console.error("Error executing swap:", error);
       const message =
-        typeof error === "object" &&
-        error &&
-        "message" in error &&
-        typeof (error as { message?: string }).message === "string"
-          ? (error as { message: string }).message
+        error instanceof Error
+          ? error.message
           : "Unknown error occurred";
       return {
         success: false,
         error: message,
       };
+    }
+  }
+
+  // ...
+  async executeSwapTokenToSol(
+    tokenMint: string,
+    tokenAmount: number,
+    minSolAmount: number,
+    wallet: WalletInput,
+    publicKey: PublicKey
+  ): Promise<{
+    success: boolean;
+    signature?: string;
+    error?: string;
+    solReceivedLamports?: number;
+  }> {
+    let latestBlockhash: BlockhashWithExpiryBlockHeight;
+    try {
+      if (!wallet || !publicKey) throw new Error("Wallet not connected or missing publicKey");
+
+      const program = this.initializeProgram(wallet);
+      const tokenMintPubkey = new PublicKey(tokenMint);
+      const userPublicKey = publicKey;
+
+      // Determine token decimals for amount conversion
+      const tokenMetadata = await tokenRegistry.getTokenMetadata(this.connection, tokenMint);
+      const tokenDecimals = tokenMetadata?.decimals || 9;
+
+      // Convert amounts
+      const tokenAmountBN = new BN(tokenAmount * Math.pow(10, tokenDecimals));
+      const minSolLamportsBN = new BN(minSolAmount * LAMPORTS_PER_SOL);
+
+      console.log('=== Token -> SOL Swap Debug ===');
+      console.log('tokenMint:', tokenMint);
+      console.log('tokenAmount (raw):', tokenAmount);
+      console.log('minSolAmount (SOL):', minSolAmount);
+      console.log('tokenDecimals:', tokenDecimals);
+      console.log('tokenAmountBN:', tokenAmountBN.toString());
+      console.log('minSolLamportsBN:', minSolLamportsBN.toString());
+
+      // Derive PDAs
+      const [poolPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool"), tokenMintPubkey.toBuffer()],
+        PROGRAM_ID
+      );
+      const [tokenVaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("token_vault"), tokenMintPubkey.toBuffer()],
+        PROGRAM_ID
+      );
+      const [solVaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("sol_vault"), tokenMintPubkey.toBuffer()],
+        PROGRAM_ID
+      );
+      
+      // User token ATA (source of tokens)
+      const userTokenAccountPda = await getAssociatedTokenAddress(
+        tokenMintPubkey,
+        userPublicKey
+      );
+
+      // Ensure user token account exists (cannot create here if user intends to spend tokens)
+      const ataInfo = await this.connection.getAccountInfo(userTokenAccountPda);
+      if (!ataInfo) {
+        throw new Error('Associated token account does not exist for this token. Please create it and fund with tokens first.');
+      }
+
+      // Check user SOL balance for transaction fees
+      const userAccountInfo = await this.connection.getAccountInfo(userPublicKey);
+      const userSolBalance = userAccountInfo?.lamports || 0;
+      const minimumSolForFees = 0.01 * LAMPORTS_PER_SOL; // Reserve 0.01 SOL for transaction fees
+      
+      if (userSolBalance < minimumSolForFees) {
+        throw new Error(`Insufficient SOL balance for transaction fees. You need at least 0.01 SOL but have ${userSolBalance / LAMPORTS_PER_SOL} SOL.`);
+      }
+      
+      console.log('User SOL balance check:', {
+        userSolBalance: userSolBalance / LAMPORTS_PER_SOL,
+        minimumRequired: minimumSolForFees / LAMPORTS_PER_SOL,
+        sufficient: userSolBalance >= minimumSolForFees
+      });
+
+      // Fetch pool and validate
+      let poolAccount;
+      try {
+        poolAccount = await program.account.liquidityPool.fetch(poolPda);
+        console.log('Pool data before swap (Token->SOL):', {
+          feeRate: poolAccount.feeRate,
+          tokenReserve: poolAccount.tokenReserve.toString(),
+          solReserve: poolAccount.solReserve.toString(),
+          tokenMint: poolAccount.tokenMint.toString(),
+          tokenVault: poolAccount.tokenVault.toString(),
+          solVault: poolAccount.solVault.toString(),
+          isInitialized: poolAccount.isInitialized
+        });
+        
+        // Validate pool state
+        if (!poolAccount.isInitialized) {
+          throw new Error('Pool is not initialized');
+        }
+        if (poolAccount.feeRate > 1000) {
+          throw new Error(`Pool has invalid fee rate: ${poolAccount.feeRate} basis points (max 1000)`);
+        }
+        if (poolAccount.tokenReserve.isZero() || poolAccount.solReserve.isZero()) {
+          throw new Error('Pool has zero reserves - no liquidity available');
+        }
+      } catch (e) {
+        console.error('Failed to fetch pool data:', e);
+        throw new Error(`Failed to fetch pool data: ${e}`);
+      }
+
+      // Check sol vault balance to ensure it has enough SOL for the swap
+      const solVaultInfo = await this.connection.getAccountInfo(solVaultPda, { commitment: 'confirmed' });
+      const solVaultBalance = solVaultInfo?.lamports || 0;
+      const solVaultOwner = solVaultInfo?.owner?.toBase58?.() || String(solVaultInfo?.owner);
+      console.log('SOL Vault balance/owner check:', {
+        solVault: solVaultPda.toBase58(),
+        solVaultOwner,
+        expectedProgramOwner: PROGRAM_ID.toBase58(),
+        systemProgram: SystemProgram.programId.toBase58(),
+        solVaultBalance: solVaultBalance / LAMPORTS_PER_SOL,
+        minSolAmountNeeded: minSolAmount,
+        sufficient: solVaultBalance >= minSolLamportsBN.toNumber()
+      });
+      
+      if (solVaultBalance < minSolLamportsBN.toNumber()) {
+        throw new Error(`Insufficient SOL in pool vault. Pool has ${solVaultBalance / LAMPORTS_PER_SOL} SOL but swap requires ${minSolAmount} SOL.`);
+      }
+
+      const TOKEN_PROGRAM_ID = new PublicKey(
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      );
+      const SYSTEM_PROGRAM_ID = new PublicKey(
+        "11111111111111111111111111111111"
+      );
+
+
+
+      // Build transaction using accountsPartial to avoid type errors
+      const transaction = await program.methods
+        .swapTokenToSol(tokenAmountBN, minSolLamportsBN)
+        .accountsPartial({
+          pool: poolPda,
+          user: userPublicKey,
+          userTokenAccount: userTokenAccountPda,
+          tokenVault: tokenVaultPda,
+          solVault: solVaultPda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SYSTEM_PROGRAM_ID,
+        })
+        .transaction();
+
+      // Compute budget tweaks
+      try {
+        transaction.instructions.unshift(
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 5000 })
+        );
+        transaction.instructions.unshift(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 })
+        );
+      } catch (e) {
+        console.warn('Failed to add compute budget instructions:', e);
+      }
+
+      // Send with robust fallbacks
+      const walletAdapter = this.createWalletAdapter(wallet);
+      const ctxSend = wallet?.sendTransaction;
+      let signature: string | undefined;
+      const maxRetries = 3;
+      latestBlockhash = await this.connection.getLatestBlockhash('confirmed');
+
+      for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
+        try {
+          const sendOptions = retryCount === 0 ? {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed' as const,
+            maxRetries: 1,
+          } : {
+            skipPreflight: true,
+            preflightCommitment: 'confirmed' as const,
+            maxRetries: 1,
+          };
+
+          transaction.feePayer = userPublicKey;
+          transaction.recentBlockhash = latestBlockhash.blockhash;
+
+          if (typeof ctxSend === 'function') {
+            signature = await ctxSend(transaction, this.connection, sendOptions);
+          } else if (typeof walletAdapter.sendTransaction === 'function') {
+            signature = await walletAdapter.sendTransaction(transaction, this.connection, sendOptions);
+          } else {
+            let signedTx;
+            if (typeof walletAdapter.signTransaction === 'function') {
+              signedTx = await walletAdapter.signTransaction(transaction);
+            } else if (typeof walletAdapter.signAllTransactions === 'function') {
+              const [signed] = await walletAdapter.signAllTransactions([transaction]);
+              signedTx = signed;
+            } else {
+              const injected = this.getInjectedProvider();
+              if (injected && typeof injected.signAndSendTransaction === 'function') {
+                signature = await injected.signAndSendTransaction(transaction);
+                break;
+              } else if (injected && typeof injected.signTransaction === 'function') {
+                const signed = await injected.signTransaction(transaction);
+                signature = await this.connection.sendRawTransaction(signed.serialize(), {
+                  skipPreflight: sendOptions.skipPreflight,
+                  preflightCommitment: sendOptions.preflightCommitment,
+                });
+                break;
+              } else {
+                throw new Error('Wallet adapter does not support sending transactions');
+              }
+            }
+            if (signedTx) {
+              signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+                skipPreflight: sendOptions.skipPreflight,
+                preflightCommitment: sendOptions.preflightCommitment,
+              });
+            }
+          }
+
+          if (!signature) throw new Error('Failed to obtain transaction signature');
+          console.log('Token->SOL swap signature:', signature);
+          // Success
+          // Confirm
+          const freshBlockhash = await this.connection.getLatestBlockhash('confirmed');
+          const confirmation = await this.connection.confirmTransaction({
+            signature,
+            blockhash: freshBlockhash.blockhash,
+            lastValidBlockHeight: freshBlockhash.lastValidBlockHeight,
+          }, 'confirmed');
+          console.log('Transaction confirmed:', confirmation);
+          if (confirmation?.value?.err) {
+            const errorStr = JSON.stringify(confirmation.value.err);
+            console.error('Transaction failed on-chain:', errorStr);
+
+            // Fetch and print program logs for diagnosis
+            try {
+              const tx = await this.connection.getTransaction(signature, {
+                commitment: 'confirmed',
+                maxSupportedTransactionVersion: 0
+              });
+              const logs = tx?.meta?.logMessages || [];
+              console.group('Program logs');
+              logs.forEach((l) => console.log(l));
+              console.groupEnd();
+            } catch (logErr) {
+              console.warn('Failed to fetch transaction logs:', logErr);
+            }
+            
+            // Parse custom error codes
+            if (errorStr.includes('Custom')) {
+              const customErrorMatch = errorStr.match(/"Custom":(\d+)/);
+              if (customErrorMatch) {
+                const errorCode = parseInt(customErrorMatch[1]);
+                console.log('Custom error code detected:', errorCode);
+                
+                // Map known error codes
+                switch (errorCode) {
+                  case 2004:
+                    throw new Error('Pool configuration error: Invalid fee rate detected. Please contact support.');
+                  case 3012:
+                    throw new Error('No liquidity pool exists for this token. Please create a liquidity pool first before attempting to swap.');
+                  case 6000:
+                    throw new Error('Slippage tolerance exceeded. Try increasing slippage or reducing swap amount.');
+                  case 6001:
+                    throw new Error('Insufficient liquidity in the pool for this swap amount.');
+                  case 6005:
+                    throw new Error('Pool has invalid fee rate configuration.');
+                  default:
+                    throw new Error(`Transaction failed with error code ${errorCode}. Please try again or contact support.`);
+                }
+              }
+            }
+            
+            throw new Error(`Transaction failed on-chain: ${errorStr}`);
+          }
+
+          return { success: true, signature, solReceivedLamports: undefined };
+        } catch (sendErr) {
+          console.warn(`Token->SOL send attempt failed:`, sendErr);
+          await new Promise(r => setTimeout(r, 800));
+          latestBlockhash = await this.connection.getLatestBlockhash('confirmed');
+          if (sendErr instanceof Error && (
+            sendErr.message.includes('User rejected') ||
+            sendErr.message.includes('denied')
+          )) {
+            throw sendErr;
+          }
+          if (sendErr instanceof Error && sendErr.message.includes('Both standard and alternative')) {
+            throw sendErr;
+          }
+          // continue retries
+        }
+      }
+
+      throw new Error('Failed to send Token->SOL swap after retries');
+    } catch (error) {
+      console.error('Error executing Token->SOL swap:', error);
+      const message = error instanceof Error
+        ? error.message
+        : 'Unknown error occurred';
+      return { success: false, error: message };
     }
   }
 

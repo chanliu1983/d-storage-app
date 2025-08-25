@@ -276,9 +276,9 @@ class TokenRegistry {
         verified: true,
       },
       {
-        mint: "H8w8FMaZQu2DFPxMbouAyh7tMG5br7WC7gTz1EWJ54ZW",
-        name: "Custom Token",
-        symbol: "CUSTOM",
+        mint: "56aSpoP6M8ho68bZR3TNjXR81Asi2fspCneKkXTWdKMA",
+        name: "Test Token",
+        symbol: "TEST",
         decimals: 9,
         verified: false,
       },

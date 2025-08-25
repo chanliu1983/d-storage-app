@@ -14,7 +14,7 @@ interface TokenInfo extends RegistryTokenInfo {
 }
 
 interface SwapForm {
-  fromToken: 'SOL';
+  fromToken: string;
   toToken: string;
   fromAmount: number;
   toAmount: number;
@@ -46,6 +46,10 @@ const TradingInterface: React.FC = () => {
   const [priceRefreshing, setPriceRefreshing] = useState(false);
   const [poolInfo, setPoolInfo] = useState<PoolInfo>({ exists: false, loading: false });
   const [customTokenInput, setCustomTokenInput] = useState('');
+  const [userTokenBalances, setUserTokenBalances] = useState<Array<{mint: string, balance: number, symbol?: string}>>([]);
+  const [solBalance, setSolBalance] = useState<number>(0);
+  
+  const [isSolToToken, setIsSolToToken] = useState(true);
   
   const [form, setForm] = useState<SwapForm>({
     fromToken: 'SOL',
@@ -93,6 +97,30 @@ const TradingInterface: React.FC = () => {
     
     loadTokens();
   }, [connected, wallet, blockchainDataService]);
+
+  // Load user token balances
+  useEffect(() => {
+    const loadUserBalances = async () => {
+      if (!connected || !publicKey) {
+         setUserTokenBalances([]);
+         setSolBalance(0);
+         return;
+       }
+
+       try {
+          const userTokens = await blockchainDataService.getUserTokenBalances(publicKey, wallet || undefined);
+        setUserTokenBalances(userTokens.filter(token => token.mint !== 'SOL'));
+        const solToken = userTokens.find(token => token.mint === 'SOL');
+        setSolBalance(solToken?.balance || 0);
+      } catch (error) {
+        console.error('Error loading user balances:', error);
+        setUserTokenBalances([]);
+        setSolBalance(0);
+      }
+    };
+
+    loadUserBalances();
+  }, [connected, wallet, blockchainDataService]);
   
   // Helper function to get default prices for demo
   const getDefaultPrice = (symbol: string): number => {
@@ -112,17 +140,40 @@ const TradingInterface: React.FC = () => {
     token.symbol.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const selectedToken = availableTokens.find(token => token.mint === form.toToken);
+  const selectedToken = availableTokens.find(token => 
+    token.mint === (isSolToToken ? form.toToken : form.fromToken)
+  );
 
-  // Calculate output amount based on current price
+  // Get current token balance for max button
+  const getCurrentTokenBalance = () => {
+    if (isSolToToken) {
+      return solBalance;
+    } else {
+      const tokenBalance = userTokenBalances.find(token => token.mint === form.fromToken);
+      return tokenBalance?.balance || 0;
+    }
+  };
+
+  // Handle max button click
+   const handleMaxAmount = () => {
+     const maxBalance = getCurrentTokenBalance();
+     setForm(prev => ({
+       ...prev,
+       fromAmount: maxBalance
+     }));
+   };
+
+  // Calculate output amount based on current price and direction
   useEffect(() => {
     if (selectedToken && form.fromAmount > 0) {
-      const outputAmount = form.fromAmount / selectedToken.price;
-      setForm(prev => ({ ...prev, toAmount: Number(outputAmount.toFixed(6)) }));
+      const outputAmount = isSolToToken
+        ? form.fromAmount / selectedToken.price // SOL -> Token
+        : form.fromAmount * selectedToken.price; // Token -> SOL
+      setForm(prev => ({ ...prev, toAmount: parseFloat(outputAmount.toFixed(6)) }));
     } else {
       setForm(prev => ({ ...prev, toAmount: 0 }));
     }
-  }, [form.fromAmount, selectedToken]);
+  }, [selectedToken, form.fromAmount, isSolToToken]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -188,7 +239,8 @@ const TradingInterface: React.FC = () => {
       return;
     }
 
-    if (!form.toToken || form.fromAmount <= 0) {
+    const tokenMint = isSolToToken ? form.toToken : form.fromToken;
+    if (!tokenMint || form.fromAmount <= 0) {
       toast.error('Please select a token and enter a valid amount');
       return;
     }
@@ -266,7 +318,7 @@ const TradingInterface: React.FC = () => {
       
       // Log the exact parameters being sent to the contract
       console.log('=== CONTRACT PARAMETERS ===');
-      console.log('tokenMint:', form.toToken);
+      console.log('tokenMint:', tokenMint);
       console.log('solAmount:', form.fromAmount);
       console.log('minTokenAmount (final):', minTokenAmount);
       console.log('minTokenAmount (raw units):', minTokenAmount * Math.pow(10, 6));
@@ -274,17 +326,39 @@ const TradingInterface: React.FC = () => {
       console.log('wallet connected:', !!wallet);
       console.log('===========================');
       
+      // Compute Token -> SOL min amount if needed
+      let minSolAmount = 0;
+      if (!isSolToToken && poolInfo.exists && selectedToken && poolInfo.tokenReserve && poolInfo.solReserve) {
+        const feeRate = poolInfo.feeRate ?? 30; // basis points
+        const feeMultiplier = 1 - feeRate / 10000;
+        const tokenAmountAfterFee = form.fromAmount * feeMultiplier;
+        const expectedSolAfterFee = (tokenAmountAfterFee * poolInfo.solReserve) / (poolInfo.tokenReserve + tokenAmountAfterFee);
+        const slippageMultiplier = 1 - (form.slippage / 100); // same convention as SOL->Token
+        const safetyBuffer = 0.99;
+        minSolAmount = expectedSolAfterFee * slippageMultiplier * safetyBuffer;
+        console.log('Token->SOL calc:', { feeRate, tokenAmountAfterFee, expectedSolAfterFee, minSolAmount });
+      }
+      
       toast.info('Preparing transaction...');
       setTransactionStatus('signing');
       
-      // Execute real blockchain swap
-      const swapResult = await blockchainDataService.executeSwap(
-        form.toToken,
-        form.fromAmount,
-        minTokenAmount,
-        { ...(wallet ?? {}), sendTransaction, signTransaction, signAllTransactions, publicKey },
-        publicKey as PublicKey
-      );
+      // Execute real blockchain swap (branch by direction)
+      const walletParams = { ...(wallet ?? {}), sendTransaction, signTransaction, signAllTransactions, publicKey };
+      const swapResult = isSolToToken
+        ? await blockchainDataService.executeSwap(
+            tokenMint,
+            form.fromAmount,
+            minTokenAmount,
+            walletParams,
+            publicKey as PublicKey
+          )
+        : await blockchainDataService.executeSwapTokenToSol(
+            tokenMint,
+            form.fromAmount,
+            minSolAmount,
+            walletParams,
+            publicKey as PublicKey
+          );
       
       if (swapResult.signature) {
         setTransactionStatus('confirming');
@@ -294,20 +368,36 @@ const TradingInterface: React.FC = () => {
       if (swapResult.success) {
         // Get the token symbol for display
         const tokenSymbol = selectedToken?.symbol || 
-          availableTokens.find(t => t.mint === form.toToken)?.symbol ||
-          `TOKEN_${form.toToken.slice(0, 8)}`;
+          availableTokens.find(t => t.mint === tokenMint)?.symbol ||
+          `TOKEN_${tokenMint.slice(0, 8)}`;
         
-        const newTrade = {
+// Safely compute tokens received for trade history without assuming swapResult shape
+        let tokensReceivedForTrade = form.toAmount;
+        if (isSolToToken && 'tokensReceived' in swapResult && typeof (swapResult as { tokensReceived?: number }).tokensReceived === 'number') {
+          tokensReceivedForTrade = (swapResult as { tokensReceived: number }).tokensReceived;
+        }
+
+        const newTrade = isSolToToken ? {
           from: 'SOL',
           to: tokenSymbol,
           amount: form.fromAmount,
-          tokensReceived: swapResult.tokensReceived || form.toAmount,
+          tokensReceived: tokensReceivedForTrade,
+          timestamp: new Date(),
+          signature: swapResult.signature
+        } : {
+          from: tokenSymbol,
+          to: 'SOL',
+          amount: form.fromAmount,
+          tokensReceived: form.toAmount,
           timestamp: new Date(),
           signature: swapResult.signature
         };
         
         setTransactionStatus('confirmed');
         setRecentTrades(prev => [newTrade, ...prev.slice(0, 4)]); // Keep last 5 trades
+        
+        // Capture the swap direction before resetting state
+        const wasSwappingSolToToken = isSolToToken;
         
         // Reset form
         setForm({
@@ -317,14 +407,20 @@ const TradingInterface: React.FC = () => {
           toAmount: 0,
           slippage: 5.0
         });
+        setIsSolToToken(true);
         
-        toast.success(
-          `Successfully swapped ${newTrade.amount} SOL for ${swapResult.tokensReceived?.toFixed(6) || form.toAmount} ${tokenSymbol}!`
-        );
+        if (wasSwappingSolToToken) {
+          toast.success(
+            `Successfully swapped ${newTrade.amount} SOL for ${(newTrade.tokensReceived ?? form.toAmount).toFixed(6)} ${tokenSymbol}!`
+          );
+        } else {
+          toast.success(
+            `Successfully swapped ${newTrade.amount} ${tokenSymbol} for ${newTrade.tokensReceived.toFixed(6)} SOL!`
+          );
+        }
         
         // Refresh user balances after successful swap
         if (publicKey) {
-          // Refresh user token balances to reflect the swap
           setTimeout(async () => {
             try {
               await blockchainDataService.getUserTokenBalances(publicKey, wallet ?? undefined);
@@ -341,7 +437,26 @@ const TradingInterface: React.FC = () => {
     } catch (error) {
       console.error('Error executing swap:', error);
       setTransactionStatus('failed');
-      toast.error(`Swap failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Please try again.';
+      
+      // Check if this is a liquidity pool error
+      if (errorMessage.includes('No liquidity pool exists for this token')) {
+        toast.error(
+          <div className="flex flex-col space-y-2">
+            <span>No liquidity pool exists for this token</span>
+            <button
+              onClick={() => window.location.href = '/liquidity'}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors"
+            >
+              Create Liquidity Pool
+            </button>
+          </div>,
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(`Swap failed: ${errorMessage}`);
+      }
     } finally {
       setIsSwapping(false);
       // Reset transaction status after a delay to show the final state
@@ -352,9 +467,33 @@ const TradingInterface: React.FC = () => {
   };
 
   const handleSwapDirection = () => {
-    // For now, this function is a placeholder since we only support SOL -> Token swaps
-    // In a full implementation, this would swap fromToken and toToken
-    toast.info('Swap direction feature coming soon!');
+    setIsSolToToken(prev => {
+      const newDirection = !prev;
+      
+      if (newDirection) {
+        // Switching to SOL -> Token
+        setForm(prevForm => ({
+          fromToken: 'SOL',
+          toToken: prevForm.fromToken !== 'SOL' ? prevForm.fromToken : '',
+          fromAmount: 0,
+          toAmount: 0,
+          slippage: prevForm.slippage
+        }));
+      } else {
+        // Switching to Token -> SOL
+        setForm(prevForm => ({
+          fromToken: prevForm.toToken || '',
+          toToken: 'SOL',
+          fromAmount: 0,
+          toAmount: 0,
+          slippage: prevForm.slippage
+        }));
+      }
+      
+      return newDirection;
+    });
+    
+    toast.info('Swapped direction');
   };
 
   // Function to check liquidity pool for a specific token
@@ -532,13 +671,13 @@ const TradingInterface: React.FC = () => {
           <div className="p-8">
 
             <div className="space-y-8">
-              {/* From Token (SOL) */}
+              {/* From Token */}
               <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
                 <label className="block text-sm font-semibold text-white/80 mb-4">
-                  From
+                  From {isSolToToken ? '(SOL)' : '(Token)'}
                 </label>
                 <div className="flex items-center space-x-4">
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
                     <input
                       type="number"
                       name="fromAmount"
@@ -546,14 +685,94 @@ const TradingInterface: React.FC = () => {
                       onChange={handleInputChange}
                       min="0"
                       step="0.000001"
-                      className="w-full px-4 py-4 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
+                      className="w-full px-4 py-4 pr-16 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
                       placeholder="0.0"
                     />
+                    <button
+                      onClick={handleMaxAmount}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      MAX
+                    </button>
                   </div>
-                  <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
-                    <span className="font-bold text-white text-lg">SOL</span>
-                  </div>
+                  {!isSolToToken ? (
+                    <div className="relative">
+                      <button
+                         onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                         className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
+                       >
+                         {form.fromToken && form.fromToken !== 'SOL' ? (
+                           <>
+                             <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
+                             <div className="flex flex-col">
+                               <span className="font-bold text-white text-sm">
+                                 {selectedToken?.symbol || `CUSTOM`}
+                               </span>
+                               {!selectedToken?.symbol && (
+                                 <span className="text-white/60 text-xs">
+                                   {form.fromToken.slice(0, 8)}...
+                                 </span>
+                               )}
+                             </div>
+                           </>
+                         ) : (
+                           <span className="text-white/70 font-medium">Select Token</span>
+                         )}
+                         <ChevronDown className="h-5 w-5 text-white/70" />
+                       </button>
+
+                       {/* Token Dropdown */}
+                       {showTokenDropdown && (
+                         <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                           <div className="p-4">
+                             <div className="relative mb-4">
+                               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                               <input
+                                 type="text"
+                                 placeholder="Search tokens..."
+                                 value={searchTerm}
+                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                 className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                               />
+                             </div>
+                             <div className="space-y-2">
+                               {filteredTokens.map((token) => (
+                                 <button
+                                   key={token.mint}
+                                   onClick={() => {
+                                     setForm(prev => ({ ...prev, fromToken: token.mint, fromAmount: 0, toAmount: 0 }));
+                                     setShowTokenDropdown(false);
+                                   }}
+                                   className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-xl transition-all duration-200 text-left"
+                                 >
+                                   <div className="flex items-center space-x-3">
+                                     <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full"></div>
+                                     <div>
+                                       <p className="font-bold text-white">{token.symbol}</p>
+                                       <p className="text-sm text-white/60">{token.name}</p>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <p className="font-medium text-white">{token.price.toFixed(8)} SOL</p>
+                                     <p className={`text-xs ${
+                                       token.change24h >= 0 ? 'text-green-300' : 'text-red-300'
+                                     }`}>
+                                       {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
+                                     </p>
+                                   </div>
+                                 </button>
+                               ))}
+                             </div>
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                  ) : (
+                    <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
+                      <span className="font-bold text-white text-lg">SOL</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -570,7 +789,7 @@ const TradingInterface: React.FC = () => {
               {/* To Token */}
               <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
                 <label className="block text-sm font-semibold text-white/80 mb-4">
-                  To
+                  To {isSolToToken ? '(Token)' : '(SOL)'}
                 </label>
                 <div className="flex items-center space-x-4">
                   <div className="flex-1">
@@ -586,79 +805,86 @@ const TradingInterface: React.FC = () => {
                       readOnly
                     />
                   </div>
-                  <div className="relative">
-                    <button
-                       onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-                       className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
-                     >
-                       {form.toToken ? (
-                         <>
-                           <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
-                           <div className="flex flex-col">
-                             <span className="font-bold text-white text-sm">
-                               {selectedToken?.symbol || `CUSTOM`}
-                             </span>
-                             {!selectedToken?.symbol && (
-                               <span className="text-white/60 text-xs">
-                                 {form.toToken.slice(0, 8)}...
+                  {!isSolToToken ? (
+                    <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
+                      <span className="font-bold text-white text-lg">SOL</span>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <button
+                         onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                         className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
+                       >
+                         {form.toToken ? (
+                           <>
+                             <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
+                             <div className="flex flex-col">
+                               <span className="font-bold text-white text-sm">
+                                 {selectedToken?.symbol || `CUSTOM`}
                                </span>
-                             )}
-                           </div>
-                         </>
-                       ) : (
-                         <span className="text-white/70 font-medium">Select Token</span>
-                       )}
-                       <ChevronDown className="h-5 w-5 text-white/70" />
-                     </button>
+                               {!selectedToken?.symbol && (
+                                 <span className="text-white/60 text-xs">
+                                   {form.toToken.slice(0, 8)}...
+                                 </span>
+                               )}
+                             </div>
+                           </>
+                         ) : (
+                           <span className="text-white/70 font-medium">Select Token</span>
+                         )}
+                         <ChevronDown className="h-5 w-5 text-white/70" />
+                       </button>
 
-                     {/* Token Dropdown */}
-                     {showTokenDropdown && (
-                       <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto">
-                         <div className="p-4">
-                           <div className="relative mb-4">
-                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                             <input
-                               type="text"
-                               placeholder="Search tokens..."
-                               value={searchTerm}
-                               onChange={(e) => setSearchTerm(e.target.value)}
-                               className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
-                             />
-                           </div>
-                           <div className="space-y-2">
-                             {filteredTokens.map((token) => (
-                               <button
-                                 key={token.mint}
-                                 onClick={() => {
-                                   setForm(prev => ({ ...prev, toToken: token.mint }));
-                                   setShowTokenDropdown(false);
-                                 }}
-                                 className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-xl transition-all duration-200 text-left"
-                               >
-                                 <div className="flex items-center space-x-3">
-                                   <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full"></div>
-                                   <div>
-                                     <p className="font-bold text-white">{token.symbol}</p>
-                                     <p className="text-sm text-white/60">{token.name}</p>
+                       {/* Token Dropdown */}
+                       {showTokenDropdown && (
+                         <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                           <div className="p-4">
+                             <div className="relative mb-4">
+                               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                               <input
+                                 type="text"
+                                 placeholder="Search tokens..."
+                                 value={searchTerm}
+                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                 className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                               />
+                             </div>
+                             <div className="space-y-2">
+                               {filteredTokens.map((token) => (
+                                 <button
+                                   key={token.mint}
+                                   onClick={() => {
+                                     setForm(prev => ({ ...prev, toToken: token.mint, fromAmount: 0, toAmount: 0 }));
+                                     setShowTokenDropdown(false);
+                                   }}
+                                   className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-xl transition-all duration-200 text-left"
+                                 >
+                                   <div className="flex items-center space-x-3">
+                                     <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full"></div>
+                                     <div>
+                                       <p className="font-bold text-white">{token.symbol}</p>
+                                       <p className="text-sm text-white/60">{token.name}</p>
+                                     </div>
                                    </div>
-                                 </div>
-                                 <div className="text-right">
-                                   <p className="font-medium text-white">{token.price.toFixed(8)} SOL</p>
-                                   <p className={`text-xs ${
-                                     token.change24h >= 0 ? 'text-green-300' : 'text-red-300'
-                                   }`}>
-                                     {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
-                                   </p>
-                                 </div>
-                               </button>
-                             ))}
+                                   <div className="text-right">
+                                     <p className="font-medium text-white">{token.price.toFixed(8)} SOL</p>
+                                     <p className={`text-xs ${
+                                       token.change24h >= 0 ? 'text-green-300' : 'text-red-300'
+                                     }`}>
+                                       {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
+                                     </p>
+                                   </div>
+                                 </button>
+                               ))}
+                             </div>
                            </div>
                          </div>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-               </div>
+                       )}
+                     </div>
+                  )}
+                </div>
+              </div>
 
               {/* Slippage Settings */}
               <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
@@ -777,12 +1003,19 @@ const TradingInterface: React.FC = () => {
                         <span className="text-red-300 font-semibold">Pool Check Result</span>
                       </div>
                       <div className="p-4 bg-red-500/20 border border-red-400/30 rounded-xl">
-                        <p className="text-red-300 text-sm mb-2">
+                        <p className="text-red-300 text-sm mb-3">
                           ⚠️ {poolInfo.error}
                         </p>
-                        <p className="text-red-200 text-xs">
-                          This token cannot be swapped because no liquidity pool exists. You may need to create a liquidity pool first or check if the token mint address is correct.
+                        <p className="text-red-200 text-xs mb-4">
+                          This token cannot be swapped because no liquidity pool exists. You need to create a liquidity pool first before you can trade this token.
                         </p>
+                        <button
+                          onClick={() => window.location.href = '/liquidity'}
+                          className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2 shadow-lg"
+                        >
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Create Liquidity Pool</span>
+                        </button>
                       </div>
                     </div>
                   )}

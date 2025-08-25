@@ -12,7 +12,7 @@ import type { FlexibleTokenExchange } from '../types/flexible_token_exchange';
 import { tokenRegistry } from '../utils/tokenRegistry';
 import type { TokenInfo } from '../utils/tokenRegistry';
 
-const PROGRAM_ID = new PublicKey('AGrFZZYRCctZB1mpq3bCdMP34DMmb6afdrw2eSCoZ2gz');
+const PROGRAM_ID = new PublicKey('HWHCbmSEp3V56MM7oVGYmdVLaFupSUUr9kpbfj2zAAuq');
 
 interface PoolData {
   tokenReserve: BN;
@@ -159,6 +159,39 @@ const LiquidityPool: React.FC = () => {
     }
   }, []);
 
+  const fetchPoolData = useCallback(async () => {
+    if (!program || !selectedToken) return;
+
+    try {
+      const tokenMint = new PublicKey(selectedToken.mint);
+      const [poolPda] = getPoolPDA(tokenMint);
+
+      const poolAccount = await program.account.liquidityPool.fetch(poolPda);
+      
+      setPoolData({
+        tokenReserve: poolAccount.tokenReserve,
+        solReserve: poolAccount.solReserve,
+        lpSupply: poolAccount.lpSupply,
+        feeRate: poolAccount.feeRate / 100,
+        tokenMint: tokenMint,
+        isInitialized: true, // If we can fetch the account, it's initialized
+      });
+    } catch (error) {
+      console.error('Error fetching pool data:', error);
+      const errorObj = error as Error;
+      
+      // Check if it's because the pool doesn't exist yet
+      if (errorObj.message.includes('Account does not exist') || errorObj.message.includes('Invalid account')) {
+        // This is expected for new tokens - don't show an error
+        setPoolData(null);
+      } else {
+        // Show error for other issues
+        setStatus(`⚠️ Unable to fetch pool data: ${errorObj.message}`);
+        setPoolData(null);
+      }
+    }
+  }, [program, selectedToken, getPoolPDA]);
+
   const initializePool = useCallback(async () => {
     console.log('initializePool function called');
     console.log('Wallet state:', { connected, publicKey: publicKey?.toString() });
@@ -190,18 +223,33 @@ const LiquidityPool: React.FC = () => {
       
       const tokenMint = new PublicKey(selectedToken.mint);
       
-      // Verify the token mint account exists
+      // Verify the token mint account exists and has mint authority
       try {
         const mintInfo = await connection.getAccountInfo(tokenMint);
         if (!mintInfo) {
           throw new Error(`Token mint account ${tokenMint.toString()} does not exist`);
         }
+        
+        // Parse mint data to check mint authority
+        if (mintInfo.data.length < 82) {
+          throw new Error(`Invalid mint account data length: ${mintInfo.data.length}`);
+        }
+        
+        // Check if mint authority exists (bytes 4-36, if all zeros then no authority)
+        const mintAuthorityBytes = mintInfo.data.slice(4, 36);
+        const hasMintAuthority = !mintAuthorityBytes.every(byte => byte === 0);
+        
+        if (!hasMintAuthority) {
+          throw new Error(`Token mint ${selectedToken.symbol} does not have a mint authority. Only tokens with mint authority can be used for liquidity pools.`);
+        }
+        
         console.log('Token mint account verified:', {
           address: tokenMint.toString(),
           owner: mintInfo.owner.toString(),
           executable: mintInfo.executable,
           lamports: mintInfo.lamports,
-          dataLength: mintInfo.data.length
+          dataLength: mintInfo.data.length,
+          hasMintAuthority: hasMintAuthority
         });
       } catch (mintError: unknown) {
         throw new Error(`Failed to verify token mint: ${mintError instanceof Error ? mintError.message : String(mintError)}`);
@@ -654,42 +702,7 @@ const LiquidityPool: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, program, selectedToken, form.tokenAmount, form.solAmount, connected, getPoolPDA, getTokenVaultPDA, getSolVaultPDA, getLpMintPDA, connection, sendTransaction, signTransaction, simulateAnyTransaction]);
-
-  const fetchPoolData = useCallback(async () => {
-    if (!program || !selectedToken) return;
-
-    try {
-      const tokenMint = new PublicKey(selectedToken.mint);
-      const [poolPda] = getPoolPDA(tokenMint);
-
-      const poolAccount = await program.account.liquidityPool.fetch(poolPda);
-      
-      setPoolData({
-        tokenReserve: poolAccount.tokenReserve,
-        solReserve: poolAccount.solReserve,
-        lpSupply: poolAccount.lpSupply,
-        feeRate: poolAccount.feeRate / 100,
-        tokenMint: tokenMint,
-        isInitialized: true, // If we can fetch the account, it's initialized
-      });
-    } catch (error) {
-      console.error('Error fetching pool data:', error);
-      const errorObj = error as Error;
-      
-      // Check if it's because the pool doesn't exist yet
-      if (errorObj.message.includes('Account does not exist') || errorObj.message.includes('Invalid account')) {
-        // This is expected for new tokens - don't show an error
-        setPoolData(null);
-      } else {
-        // Show error for other issues
-        setStatus(`⚠️ Unable to fetch pool data: ${errorObj.message}`);
-        setPoolData(null);
-      }
-    }
-  }, [program, selectedToken, getPoolPDA]);
-
-
+  }, [connected, publicKey, selectedToken, form.tokenAmount, form.solAmount, program, getPoolPDA, getTokenVaultPDA, getSolVaultPDA, getLpMintPDA, connection, simulateAnyTransaction, sendTransaction, signTransaction, fetchPoolData]);
 
   useEffect(() => {
     if (selectedToken) {

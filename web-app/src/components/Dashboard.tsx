@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { 
   TrendingUp, 
@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
   const [portfolioChange24h, setPortfolioChange24h] = useState(0);
   const [userBalance, setUserBalance] = useState(0);
 
-  const blockchainService = new BlockchainDataService(connection);
+const blockchainService = useMemo(() => new BlockchainDataService(connection), [connection]);
 
   const loadExchangeData = useCallback(async () => {
     if (!publicKey) return;
@@ -125,7 +125,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [publicKey, wallet, connection]);
+  }, [publicKey, blockchainService, wallet]);
 
   useEffect(() => {
     if (publicKey) {

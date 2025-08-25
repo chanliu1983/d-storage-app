@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-flexible_token_exchange = "AGrFZZYRCctZB1mpq3bCdMP34DMmb6afdrw2eSCoZ2gz"
+flexible_token_exchange = "CZEiX9NY3idiU3AFdafekgEkvH31W8ZF5P8sC8tHwC4v"
 
 [programs.devnet]
-flexible_token_exchange = "AGrFZZYRCctZB1mpq3bCdMP34DMmb6afdrw2eSCoZ2gz"
+flexible_token_exchange = "HWHCbmSEp3V56MM7oVGYmdVLaFupSUUr9kpbfj2zAAuq"
 
 [registry]
 url = "https://api.apr.dev"
