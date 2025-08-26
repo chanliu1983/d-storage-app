@@ -6,7 +6,7 @@ import { PublicKey, LAMPORTS_PER_SOL, Transaction, VersionedTransaction, Transac
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import type { Idl } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { Loader2, Plus, Coins, BarChart3, Zap, ArrowRight } from 'lucide-react';
+import { Loader2, Plus, Coins, BarChart3, Zap, ArrowRight, Minus } from 'lucide-react';
 import idl from '../idl/flexible_token_exchange.json';
 import type { FlexibleTokenExchange } from '../types/flexible_token_exchange';
 import { tokenRegistry } from '../utils/tokenRegistry';
@@ -44,6 +44,14 @@ const LiquidityPool: React.FC = () => {
     solAmount: '',
     operation: 'add'
   });
+  
+  const [removeLiquidityForm, setRemoveLiquidityForm] = useState({
+    lpTokens: '',
+    minTokenAmount: '',
+    minSolAmount: ''
+  });
+  
+  const [userLpBalance, setUserLpBalance] = useState<number>(0);
   const [validationErrors, setValidationErrors] = useState<{
     tokenAmount?: string;
     solAmount?: string;
@@ -191,6 +199,253 @@ const LiquidityPool: React.FC = () => {
       }
     }
   }, [program, selectedToken, getPoolPDA]);
+
+  const fetchUserLpBalance = useCallback(async () => {
+    console.log('🔍 [DEBUG] fetchUserLpBalance called');
+    console.log('🔍 [DEBUG] Initial checks:', {
+      program: !!program,
+      selectedToken: selectedToken ? {
+        symbol: selectedToken.symbol,
+        mint: selectedToken.mint,
+        decimals: selectedToken.decimals
+      } : null,
+      publicKey: publicKey?.toString()
+    });
+    
+    if (!program || !selectedToken || !publicKey) {
+      console.log('🔍 [DEBUG] Missing required data, returning early');
+      return;
+    }
+
+    try {
+      const tokenMint = new PublicKey(selectedToken.mint);
+      console.log('🔍 [DEBUG] Token mint:', tokenMint.toString());
+      
+      const [lpMint] = getLpMintPDA(tokenMint);
+      console.log('🔍 [DEBUG] LP mint PDA calculated:', lpMint.toString());
+      
+      // Get user's LP token account
+      const userLpTokenAccount = await getAssociatedTokenAddress(
+        lpMint,
+        publicKey
+      );
+      console.log('🔍 [DEBUG] User LP token account address:', userLpTokenAccount.toString());
+      
+      const accountInfo = await connection.getAccountInfo(userLpTokenAccount);
+      console.log('🔍 [DEBUG] Account info exists:', !!accountInfo);
+      
+      if (accountInfo) {
+        console.log('🔍 [DEBUG] Account info details:', {
+          lamports: accountInfo.lamports,
+          owner: accountInfo.owner.toString(),
+          executable: accountInfo.executable,
+          rentEpoch: accountInfo.rentEpoch
+        });
+        
+        const tokenAccount = await connection.getTokenAccountBalance(userLpTokenAccount);
+        console.log('🔍 [DEBUG] Token account balance details:', {
+          amount: tokenAccount.value.amount,
+          decimals: tokenAccount.value.decimals,
+          uiAmount: tokenAccount.value.uiAmount,
+          uiAmountString: tokenAccount.value.uiAmountString
+        });
+        
+        const balance = tokenAccount.value.uiAmount || 0;
+        console.log('🔍 [DEBUG] Setting userLpBalance to:', balance);
+        setUserLpBalance(balance);
+      } else {
+        console.log('🔍 [DEBUG] No account info found, setting userLpBalance to 0');
+        setUserLpBalance(0);
+      }
+    } catch (error) {
+      console.error('🔍 [DEBUG] Error fetching user LP balance:', error);
+      console.error('🔍 [DEBUG] Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      setUserLpBalance(0);
+    }
+  }, [program, selectedToken, publicKey, connection, getLpMintPDA]);
+
+  const addLiquidity = useCallback(async () => {
+    if (!program || !publicKey || !selectedToken || !poolData) {
+      setStatus('❌ Missing required data for adding liquidity');
+      return;
+    }
+
+    setLoading(true);
+    setStatus('🔄 Adding liquidity to existing pool...');
+
+    try {
+      // Validation
+      if (!form.tokenAmount || !form.solAmount) {
+        throw new Error('Please enter both token and SOL amounts');
+      }
+
+      if (parseFloat(form.tokenAmount) <= 0 || parseFloat(form.solAmount) <= 0) {
+        throw new Error('Amounts must be greater than 0');
+      }
+
+      const tokenMint = new PublicKey(selectedToken.mint);
+      
+      // Get all required PDAs
+      const [poolPda] = getPoolPDA(tokenMint);
+      const [tokenVault] = getTokenVaultPDA(tokenMint);
+      const [solVault] = getSolVaultPDA(tokenMint);
+      
+      // Check user balances
+      const balance = await connection.getBalance(publicKey);
+      const requiredSol = parseFloat(form.solAmount) * LAMPORTS_PER_SOL;
+      const estimatedFees = 0.01 * LAMPORTS_PER_SOL;
+      
+      if (balance < requiredSol + estimatedFees) {
+        throw new Error(`Insufficient SOL balance. Required: ${(requiredSol + estimatedFees) / LAMPORTS_PER_SOL} SOL, Available: ${balance / LAMPORTS_PER_SOL} SOL`);
+      }
+      
+      const userTokenAccount = await getAssociatedTokenAddress(tokenMint, publicKey);
+      
+      // Check token balance
+      try {
+        const tokenAccountInfo = await connection.getTokenAccountBalance(userTokenAccount);
+        const requiredTokens = parseFloat(form.tokenAmount) * Math.pow(10, selectedToken.decimals);
+        const availableTokens = parseFloat(tokenAccountInfo.value.amount);
+        
+        if (availableTokens < requiredTokens) {
+          throw new Error(`Insufficient token balance. Required: ${form.tokenAmount} ${selectedToken.symbol}, Available: ${availableTokens / Math.pow(10, selectedToken.decimals)} ${selectedToken.symbol}`);
+        }
+      } catch (tokenError: unknown) {
+        if (tokenError instanceof Error && tokenError.message.includes('could not find account')) {
+          throw new Error(`Token account not found. Please ensure you have ${selectedToken.symbol} tokens in your wallet.`);
+        }
+        throw tokenError;
+      }
+      
+      const tokenAmountBN = new BN(parseFloat(form.tokenAmount) * Math.pow(10, selectedToken.decimals));
+      const solAmountBN = new BN(parseFloat(form.solAmount) * LAMPORTS_PER_SOL);
+      const minLpTokensBN = new BN(0); // Accept any amount of LP tokens
+      
+      console.log('Adding liquidity with amounts:', {
+        tokenAmount: tokenAmountBN.toString(),
+        solAmount: solAmountBN.toString(),
+        minLpTokens: minLpTokensBN.toString(),
+        poolPda: poolPda.toString()
+      });
+      
+      // Try RPC method first
+      try {
+        console.log('Attempting to add liquidity with RPC method...');
+        const signature = await program.methods
+          .addLiquidity(tokenAmountBN, solAmountBN, minLpTokensBN)
+          .accountsPartial({
+            pool: poolPda,
+            user: publicKey,
+            userTokenAccount: userTokenAccount,
+            tokenVault: tokenVault,
+            solVault: solVault,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+        
+        console.log('Liquidity added successfully with signature:', signature);
+        setStatus('✅ Liquidity added successfully!');
+        setLoading(false);
+        
+        // Refresh pool data and user LP balance
+        await fetchPoolData();
+        await fetchUserLpBalance();
+        
+        // Clear form
+        setForm(prev => ({ ...prev, tokenAmount: '', solAmount: '' }));
+        return;
+      } catch (rpcError: unknown) {
+        console.log('RPC method failed, trying transaction method:', rpcError instanceof Error ? rpcError.message : String(rpcError));
+      }
+      
+      // Fall back to transaction method
+      const transaction = await program.methods
+        .addLiquidity(tokenAmountBN, solAmountBN, minLpTokensBN)
+        .accountsPartial({
+          pool: poolPda,
+          user: publicKey,
+          userTokenAccount: userTokenAccount,
+          tokenVault: tokenVault,
+          solVault: solVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .transaction();
+      
+      if (!transaction) {
+        throw new Error('Failed to build transaction');
+      }
+      
+      // Get fresh blockhash and set transaction properties
+      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = publicKey;
+      
+      // Simulate transaction
+      console.log('Simulating add liquidity transaction...');
+      setStatus('Validating transaction...');
+      
+      try {
+        const simulationResult = await simulateAnyTransaction(connection, transaction, publicKey);
+        
+        if (simulationResult.value.err) {
+          console.error('Transaction simulation failed:', simulationResult.value.err);
+          throw new Error(`Transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`);
+        }
+        
+        console.log('Transaction simulation successful');
+      } catch (simError: unknown) {
+        console.error('Simulation error:', simError);
+        throw new Error(`Transaction validation failed: ${simError instanceof Error ? simError.message : String(simError)}`);
+      }
+      
+      console.log('Sending transaction to wallet for signing...');
+      setStatus('Please approve the transaction in your wallet...');
+      
+      // Send transaction
+      const signature = await sendTransaction(transaction, connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3
+      });
+      
+      console.log('Add liquidity transaction sent, signature:', signature);
+      setStatus('⏳ Confirming transaction...');
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      }, 'confirmed');
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+      
+      console.log('Add liquidity transaction confirmed');
+      setStatus('✅ Liquidity added successfully!');
+      
+      // Refresh pool data and user LP balance
+      await fetchPoolData();
+      await fetchUserLpBalance();
+      
+      // Clear form
+      setForm(prev => ({ ...prev, tokenAmount: '', solAmount: '' }));
+      
+    } catch (error: unknown) {
+      console.error('Add liquidity error:', error);
+      const errorObj = error as Error;
+      setStatus(`❌ Failed to add liquidity: ${errorObj.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [program, publicKey, selectedToken, poolData, form.tokenAmount, form.solAmount, connection, getPoolPDA, getTokenVaultPDA, getSolVaultPDA, simulateAnyTransaction, sendTransaction, fetchPoolData, fetchUserLpBalance]);
 
   const initializePool = useCallback(async () => {
     console.log('initializePool function called');
@@ -710,6 +965,13 @@ const LiquidityPool: React.FC = () => {
     }
   }, [selectedToken, fetchPoolData]);
 
+  // Fetch user LP balance when token is selected and wallet is connected
+  useEffect(() => {
+    if (selectedToken && connected && publicKey) {
+      fetchUserLpBalance();
+    }
+  }, [selectedToken, connected, publicKey, fetchUserLpBalance]);
+
   // Handle URL parameters for pre-filling
   useEffect(() => {
     const tokenMint = searchParams.get('token');
@@ -879,6 +1141,9 @@ const LiquidityPool: React.FC = () => {
       setCustomTokenMint('');
       setCustomTokenName('');
       setStatus(`✅ Token "${tokenMetadata.name}" (${tokenMetadata.symbol}) added successfully`);
+      
+      // Fetch existing pool data when custom token is selected
+      await fetchPoolData();
     } catch (error) {
       console.error('Error adding custom token:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -887,6 +1152,118 @@ const LiquidityPool: React.FC = () => {
       setLoadingCustomToken(false);
     }
   }, [customTokenMint, customTokenName, selectedToken, connection]);
+
+  const removeLiquidity = useCallback(async () => {
+    console.log('=== removeLiquidity function called ===');
+    console.log('Initial validation checks:');
+    console.log('  - connected:', connected);
+    console.log('  - publicKey:', publicKey?.toString());
+    console.log('  - program:', !!program);
+    console.log('  - selectedToken:', selectedToken);
+    
+    if (!connected || !publicKey || !program || !selectedToken) {
+      console.log('❌ Validation failed: Missing wallet connection or token');
+      setStatus('❌ Please connect your wallet and select a token first.');
+      return;
+    }
+
+    console.log('Form validation:');
+    console.log('  - lpTokens:', removeLiquidityForm.lpTokens);
+    console.log('  - minTokenAmount:', removeLiquidityForm.minTokenAmount);
+    console.log('  - minSolAmount:', removeLiquidityForm.minSolAmount);
+    
+    if (!removeLiquidityForm.lpTokens || !removeLiquidityForm.minTokenAmount || !removeLiquidityForm.minSolAmount) {
+      console.log('❌ Form validation failed: Missing required fields');
+      setStatus('❌ Please fill in all required fields.');
+      return;
+    }
+
+    console.log('✅ All validations passed, proceeding with liquidity removal...');
+    setLoading(true);
+    setStatus('🔄 Removing liquidity...');
+
+    try {
+      const tokenMint = new PublicKey(selectedToken.mint);
+      
+      // Derive PDAs using the same pattern as other functions
+      const [poolPda] = getPoolPDA(tokenMint);
+      const [poolAuthority] = PublicKey.findProgramAddressSync(
+        [Buffer.from('pool_authority'), tokenMint.toBytes()],
+        PROGRAM_ID
+      );
+      const [tokenVault] = getTokenVaultPDA(tokenMint);
+      const [solVault] = getSolVaultPDA(tokenMint);
+      const [lpMint] = getLpMintPDA(tokenMint);
+
+      // Get user's token account
+      const userTokenAccount = await getAssociatedTokenAddress(
+        new PublicKey(selectedToken.mint),
+        publicKey
+      );
+
+      // Get user's LP token account
+      const userLpTokenAccount = await getAssociatedTokenAddress(
+        lpMint,
+        publicKey
+      );
+
+      console.log('Remove Liquidity PDAs:', {
+        poolPda: poolPda.toString(),
+        poolAuthority: poolAuthority.toString(),
+        tokenVault: tokenVault.toString(),
+        solVault: solVault.toString(),
+        lpMint: lpMint.toString(),
+        userTokenAccount: userTokenAccount.toString(),
+        userLpTokenAccount: userLpTokenAccount.toString()
+      });
+
+      // Convert amounts to BN
+      const lpTokensAmount = new BN(parseFloat(removeLiquidityForm.lpTokens) * Math.pow(10, 9)); // Assuming 9 decimals for LP tokens
+      const minTokenAmount = new BN(parseFloat(removeLiquidityForm.minTokenAmount) * Math.pow(10, selectedToken.decimals || 9));
+      const minSolAmount = new BN(parseFloat(removeLiquidityForm.minSolAmount) * LAMPORTS_PER_SOL);
+
+      console.log('Remove Liquidity Amounts:', {
+        lpTokens: lpTokensAmount.toString(),
+        minTokenAmount: minTokenAmount.toString(),
+        minSolAmount: minSolAmount.toString()
+      });
+
+      // Call remove_liquidity function
+      const tx = await program.methods
+        .removeLiquidity(lpTokensAmount, minTokenAmount, minSolAmount)
+        .accountsPartial({
+          pool: poolPda,
+          user: publicKey,
+          userTokenAccount: userTokenAccount,
+          tokenVault: tokenVault,
+          solVault: solVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log('Remove liquidity transaction signature:', tx);
+      setStatus(`✅ Liquidity removed successfully! Transaction: ${tx}`);
+      
+      // Reset form
+      setRemoveLiquidityForm({
+        lpTokens: '',
+        minTokenAmount: '',
+        minSolAmount: ''
+      });
+      
+      // Refresh pool data and user LP balance
+      await fetchPoolData();
+      await fetchUserLpBalance();
+      
+    } catch (error) {
+      console.error('Error removing liquidity:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`❌ Failed to remove liquidity: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [connected, publicKey, program, selectedToken, removeLiquidityForm, fetchPoolData, fetchUserLpBalance, setStatus, setLoading, getLpMintPDA, getPoolPDA, getSolVaultPDA, getTokenVaultPDA]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -1090,13 +1467,19 @@ const LiquidityPool: React.FC = () => {
                       ) : (
                         <select
                           value={selectedToken ? (selectedToken as TokenInfo).mint : ''}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (e.target.value) {
                               const token = popularTokens.find(t => t.mint === e.target.value);
                               if (token) {
                                 setSelectedToken(token);
                                 setForm(prev => ({ ...prev, selectedTokenMint: token.mint }));
+                                // Fetch existing pool data when token is selected
+                                await fetchPoolData();
                               }
+                            } else {
+                              setSelectedToken(null);
+                              setForm(prev => ({ ...prev, selectedTokenMint: '' }));
+                              setPoolData(null);
                             }
                           }}
                           className="w-full p-4 backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-300 shadow-lg"
@@ -1185,6 +1568,77 @@ const LiquidityPool: React.FC = () => {
                 )}
               </div>
 
+              {/* Existing Pool Data Display */}
+              {selectedToken && poolData && (
+                <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/30 to-indigo-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
+                      <svg className="w-6 h-6 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-white">Existing Pool Found</h3>
+                      <p className="text-white/70">Pool already exists for {selectedToken.symbol}/SOL pair</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="backdrop-blur-sm bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-400/20 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        {selectedToken.logoUri ? (
+                          <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-5 h-5 rounded-full border border-white/20" />
+                        ) : (
+                          <div className="w-5 h-5 bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
+                            <span className="text-blue-300 font-bold text-xs">{selectedToken.symbol[0]}</span>
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-blue-200">{selectedToken.symbol} Reserve</span>
+                      </div>
+                      <p className="text-xl font-bold text-white">
+                        {poolData.tokenReserve ? (poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals || 9)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
+                      </p>
+                    </div>
+                    
+                    <div className="backdrop-blur-sm bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-400/20 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="w-5 h-5 bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
+                          <span className="text-purple-300 font-bold text-xs">◎</span>
+                        </div>
+                        <span className="text-sm font-medium text-purple-200">SOL Reserve</span>
+                      </div>
+                      <p className="text-xl font-bold text-white">
+                        {poolData.solReserve ? (poolData.solReserve.toNumber() / 1e9).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'} SOL
+                      </p>
+                    </div>
+                    
+                    <div className="backdrop-blur-sm bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-400/20 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium text-green-200">LP Supply</span>
+                      </div>
+                      <p className="text-xl font-bold text-white">
+                        {poolData.lpSupply ? (poolData.lpSupply.toNumber() / 1e9).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
+                      </p>
+                    </div>
+                    
+                    <div className="backdrop-blur-sm bg-gradient-to-br from-yellow-500/10 to-orange-600/10 border border-yellow-400/20 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium text-yellow-200">Fee Rate</span>
+                      </div>
+                      <p className="text-xl font-bold text-white">
+                        {poolData.feeRate ? (poolData.feeRate / 100).toFixed(2) : '0.30'}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Pool Configuration */}
               {selectedToken && (
                   <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
@@ -1193,8 +1647,8 @@ const LiquidityPool: React.FC = () => {
                         <Plus className="w-6 h-6 text-green-300" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-white">Initialize Liquidity Pool</h3>
-                        <p className="text-white/70">Set initial liquidity amounts for {selectedToken.symbol}/SOL pair</p>
+                        <h3 className="text-2xl font-bold text-white">{poolData ? 'Add Liquidity' : 'Initialize Liquidity Pool'}</h3>
+                        <p className="text-white/70">{poolData ? 'Add more liquidity to the existing' : 'Set initial liquidity amounts for'} {selectedToken.symbol}/SOL pair</p>
                         <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-xl p-4 mt-4">
                           <div className="flex items-start space-x-3">
                             <div className="bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full p-2 mt-0.5 border border-white/20">
@@ -1317,10 +1771,15 @@ const LiquidityPool: React.FC = () => {
                         console.log('Form validation result:', isFormValid);
                         
                         if (isFormValid) {
-                          console.log('✅ Form is valid, calling initializePool...');
-                          initializePool();
+                          if (poolData) {
+                            console.log('✅ Form is valid, calling addLiquidity...');
+                            addLiquidity();
+                          } else {
+                            console.log('✅ Form is valid, calling initializePool...');
+                            initializePool();
+                          }
                         } else {
-                          console.log('❌ Form validation failed, not calling initializePool');
+                          console.log('❌ Form validation failed, not calling function');
                           console.log('Validation errors after validateForm:', validationErrors);
                         }
                         console.log('=== End Button Click Debug ===');
@@ -1331,12 +1790,12 @@ const LiquidityPool: React.FC = () => {
                       {loading ? (
                         <span className="flex items-center justify-center">
                           <Loader2 className="w-5 h-5 animate-spin mr-3" />
-                          Initializing Pool...
+                          {poolData ? 'Adding Liquidity...' : 'Initializing Pool...'}
                         </span>
                       ) : poolData ? (
                         <span className="flex items-center justify-center">
-                          <span className="mr-2">✅</span>
-                          Pool Successfully Initialized
+                          <span className="mr-2">💧</span>
+                          Add Liquidity
                         </span>
                       ) : (
                         <span className="flex items-center justify-center">
@@ -1345,6 +1804,317 @@ const LiquidityPool: React.FC = () => {
                         </span>
                       )}
                     </button>
+                  </div>
+                )}
+
+                {/* Remove Liquidity Section */}
+                {poolData && selectedToken && (
+                  <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+                    <div className="flex items-center space-x-3 mb-6">
+                      <div className="w-10 h-10 bg-gradient-to-br from-red-500/30 to-pink-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
+                        <Minus className="w-5 h-5 text-red-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Remove Liquidity</h3>
+                        <p className="text-white/70">Withdraw your tokens and SOL from the pool</p>
+                      </div>
+                    </div>
+                    
+                    {/* User Liquidity Position Display */}
+                    <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-xl p-6 mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-blue-200">Your Liquidity Position</h4>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={fetchUserLpBalance}
+                            className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-all duration-200"
+                          >
+                            Refresh
+                          </button>
+                          <button
+                            onClick={() => {
+                              console.log('🔧 [MANUAL DEBUG] Debug button clicked - triggering fetchUserLpBalance with full logging');
+                              fetchUserLpBalance();
+                            }}
+                            className="px-3 py-1 bg-orange-500/20 border border-orange-400/30 rounded-lg text-orange-300 text-sm hover:bg-orange-500/30 transition-all duration-200"
+                            title="Debug LP Balance - Check console for detailed logs"
+                          >
+                            🔧 Debug
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
+                          <p className="text-sm font-medium text-white/70 mb-1">LP Token Balance</p>
+                          <p className="text-xl font-bold text-white">{userLpBalance ? userLpBalance.toFixed(4) : '0.0000'}</p>
+                          <p className="text-xs text-white/50">LP tokens</p>
+                        </div>
+                        
+                        {poolData && userLpBalance && (
+                          <>
+                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
+                              <p className="text-sm font-medium text-white/70 mb-1">Pool Share</p>
+                              <p className="text-xl font-bold text-green-300">
+                                {poolData.lpSupply.toNumber() > 0 
+                                  ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * 100).toFixed(2)
+                                  : '0.00'
+                                }%
+                              </p>
+                              <p className="text-xs text-white/50">of total pool</p>
+                            </div>
+                            
+                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
+                              <p className="text-sm font-medium text-white/70 mb-1">Estimated Value</p>
+                              <div className="space-y-1">
+                                <p className="text-sm text-white">
+                                  {poolData.lpSupply.toNumber() > 0 
+                                    ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals)).toFixed(4)
+                                    : '0.0000'
+                                  } {selectedToken.symbol}
+                                </p>
+                                <p className="text-sm text-white">
+                                  {poolData.lpSupply.toNumber() > 0 
+                                    ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * poolData.solReserve.toNumber() / LAMPORTS_PER_SOL).toFixed(4)
+                                    : '0.0000'
+                                  } SOL
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {(!poolData || !userLpBalance) && (
+                          <>
+                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
+                              <p className="text-sm font-medium text-white/70 mb-1">Pool Share</p>
+                              <p className="text-xl font-bold text-white/50">0.00%</p>
+                              <p className="text-xs text-white/50">of total pool</p>
+                            </div>
+                            
+                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
+                              <p className="text-sm font-medium text-white/70 mb-1">Estimated Value</p>
+                              <div className="space-y-1">
+                                <p className="text-sm text-white/50">0.0000 {selectedToken.symbol}</p>
+                                <p className="text-sm text-white/50">0.0000 SOL</p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {userLpBalance && userLpBalance > 0 && (
+                        <div className="mt-4 p-3 bg-green-500/10 border border-green-400/20 rounded-lg">
+                          <p className="text-sm text-green-300 flex items-center">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                            You have an active liquidity position in this pool
+                          </p>
+                        </div>
+                      )}
+                      
+                      {(!userLpBalance || userLpBalance === 0) && (
+                        <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-400/20 rounded-lg">
+                          <div className="text-sm text-yellow-300 flex items-center">
+                            <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
+                            You don't have any liquidity in this pool yet
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium text-white/80">
+                          LP Tokens to Remove
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={removeLiquidityForm.lpTokens}
+                            onChange={(e) => {
+                              const lpAmount = e.target.value;
+                              setRemoveLiquidityForm(prev => ({ ...prev, lpTokens: lpAmount }));
+                              
+                              // Auto-calculate minimum amounts with 1% slippage if pool data exists
+                              if (poolData && lpAmount && parseFloat(lpAmount) > 0) {
+                                const lpTokensToRemove = parseFloat(lpAmount) * Math.pow(10, 9); // Convert to raw amount
+                                const lpSupply = poolData.lpSupply.toNumber();
+                                
+                                if (lpSupply > 0) {
+                                  // Calculate expected token and SOL amounts
+                                  const tokenShare = lpTokensToRemove / lpSupply;
+                                  const expectedTokenAmount = tokenShare * poolData.tokenReserve.toNumber();
+                                  const expectedSolAmount = tokenShare * poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
+                                  
+                                  // Apply 1% slippage (99% of expected)
+                                  const minTokenAmount = (expectedTokenAmount * 0.99).toFixed(6);
+                                  const minSolAmount = (expectedSolAmount * 0.99).toFixed(6);
+                                  
+                                  setRemoveLiquidityForm(prev => ({
+                                    ...prev,
+                                    minTokenAmount,
+                                    minSolAmount
+                                  }));
+                                }
+                              } else {
+                                // Clear minimum amounts if no LP amount entered
+                                setRemoveLiquidityForm(prev => ({
+                                  ...prev,
+                                  minTokenAmount: '',
+                                  minSolAmount: ''
+                                }));
+                              }
+                            }}
+                            placeholder="Enter LP tokens amount"
+                            className="w-full px-4 py-3 pr-16 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-400/50 focus:border-red-400/50 transition-all duration-200"
+                          />
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                            <span className="text-white/60 text-sm">LP</span>
+                          </div>
+                        </div>
+                        {userLpBalance && (
+                          <button
+                            onClick={() => {
+                              const maxLpAmount = userLpBalance.toString();
+                              setRemoveLiquidityForm(prev => ({ ...prev, lpTokens: maxLpAmount }));
+                              
+                              // Auto-calculate minimum amounts with 1% slippage for max amount
+                              if (poolData && userLpBalance > 0) {
+                                const lpTokensToRemove = userLpBalance * Math.pow(10, 9); // Convert to raw amount
+                                const lpSupply = poolData.lpSupply.toNumber();
+                                
+                                if (lpSupply > 0) {
+                                  // Calculate expected token and SOL amounts
+                                  const tokenShare = lpTokensToRemove / lpSupply;
+                                  const expectedTokenAmount = tokenShare * poolData.tokenReserve.toNumber();
+                                  const expectedSolAmount = tokenShare * poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
+                                  
+                                  // Apply 1% slippage (99% of expected)
+                                  const minTokenAmount = (expectedTokenAmount * 0.99).toFixed(6);
+                                  const minSolAmount = (expectedSolAmount * 0.99).toFixed(6);
+                                  
+                                  setRemoveLiquidityForm(prev => ({
+                                    ...prev,
+                                    minTokenAmount,
+                                    minSolAmount
+                                  }));
+                                }
+                              }
+                            }}
+                            className="text-xs text-red-300 hover:text-red-200 transition-colors"
+                          >
+                            Use Max: {userLpBalance.toFixed(4)}
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium text-white/80">
+                          Min {selectedToken.symbol} Amount
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={removeLiquidityForm.minTokenAmount}
+                            onChange={(e) => setRemoveLiquidityForm(prev => ({ ...prev, minTokenAmount: e.target.value }))}
+                            placeholder="Minimum tokens to receive"
+                            className="w-full px-4 py-3 pr-20 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
+                          />
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                            {selectedToken.logoUri ? (
+                              <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-4 h-4 rounded-full border border-white/20" />
+                            ) : (
+                              <div className="w-4 h-4 bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
+                                <span className="text-blue-300 font-bold text-xs">{selectedToken.symbol[0]}</span>
+                              </div>
+                            )}
+                            <span className="text-white/60 text-xs">{selectedToken.symbol}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium text-white/80">
+                          Min SOL Amount
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={removeLiquidityForm.minSolAmount}
+                            onChange={(e) => setRemoveLiquidityForm(prev => ({ ...prev, minSolAmount: e.target.value }))}
+                            placeholder="Minimum SOL to receive"
+                            className="w-full px-4 py-3 pr-16 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-200"
+                          />
+                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                            <div className="w-4 h-4 bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
+                              <span className="text-purple-300 font-bold text-xs">◎</span>
+                            </div>
+                            <span className="text-white/60 text-xs">SOL</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={(e) => {
+                        console.log('🔥 BUTTON CLICK DETECTED! Event:', e);
+                        alert('Button clicked! Check console for details.');
+                        
+                        console.log('=== Remove Liquidity Button Clicked ===');
+                        console.log('Current state values:');
+                        console.log('  - loading:', loading);
+                        console.log('  - removeLiquidityForm:', removeLiquidityForm);
+                        console.log('  - userLpBalance:', userLpBalance);
+                        console.log('  - selectedToken:', selectedToken);
+                        console.log('  - connected:', connected);
+                        console.log('  - publicKey:', publicKey?.toString());
+                        console.log('  - program:', !!program);
+                        
+                        const buttonDisabled = loading || !removeLiquidityForm.lpTokens || !removeLiquidityForm.minTokenAmount || !removeLiquidityForm.minSolAmount || !userLpBalance || parseFloat(removeLiquidityForm.lpTokens) > userLpBalance;
+                        console.log('Button disabled calculation:', buttonDisabled);
+                        console.log('  - loading:', loading);
+                        console.log('  - !removeLiquidityForm.lpTokens:', !removeLiquidityForm.lpTokens);
+                        console.log('  - !removeLiquidityForm.minTokenAmount:', !removeLiquidityForm.minTokenAmount);
+                        console.log('  - !removeLiquidityForm.minSolAmount:', !removeLiquidityForm.minSolAmount);
+                        console.log('  - !userLpBalance:', !userLpBalance);
+                        console.log('  - lpTokens > userLpBalance:', parseFloat(removeLiquidityForm.lpTokens) > userLpBalance);
+                        
+                        if (!buttonDisabled) {
+                          console.log('✅ Button is enabled, calling removeLiquidity...');
+                          removeLiquidity();
+                        } else {
+                          console.log('❌ Button is disabled, not calling removeLiquidity');
+                        }
+                      }}
+                      disabled={loading || !removeLiquidityForm.lpTokens || !removeLiquidityForm.minTokenAmount || !removeLiquidityForm.minSolAmount || !userLpBalance || parseFloat(removeLiquidityForm.lpTokens) > userLpBalance}
+                      className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-red-500/20 to-pink-600/20 backdrop-blur-sm border border-red-400/30 rounded-xl text-white font-semibold hover:from-red-500/30 hover:to-pink-600/30 hover:border-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-red-500/20"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin mr-3" />
+                          Removing Liquidity...
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center">
+                          <Minus className="w-5 h-5 mr-2" />
+                          Remove Liquidity
+                        </span>
+                      )}
+                    </button>
+                    
+                    <div className="backdrop-blur-sm bg-yellow-500/10 border border-yellow-400/20 rounded-xl p-4 mt-4">
+                      <div className="flex items-start space-x-2">
+                        <div className="w-5 h-5 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mt-0.5">
+                          <span className="text-yellow-900 text-xs font-bold">!</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-yellow-200">Slippage Protection</p>
+                          <p className="text-sm text-yellow-300 mt-1">
+                            Set minimum amounts to protect against slippage. The transaction will fail if you receive less than the specified minimums.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

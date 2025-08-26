@@ -265,16 +265,22 @@ class BlockchainDataService {
           const poolData = await this.getPoolData(program, tokenMint);
 
           if (poolData && poolData.isInitialized) {
-            // Calculate price based on pool reserves
             const tokenReserveNumber =
               poolData.tokenReserve.toNumber() / Math.pow(10, token.decimals);
-            const solReserveNumber =
-              poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
-
-            const price =
-              tokenReserveNumber > 0
-                ? solReserveNumber / tokenReserveNumber
-                : 0;
+            const solReserveNumber = poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
+            
+            // Calculate dynamic price from pool reserves: SOL reserve / token reserve
+            let price: number;
+            if (tokenReserveNumber > 0 && solReserveNumber > 0) {
+              price = solReserveNumber / tokenReserveNumber;
+              console.log(`Dynamic price for ${token.symbol}: ${price} SOL per token (from reserves)`);
+            } else {
+              // Fallback to fixed price if reserves are invalid
+              const FIXED_TOKEN_PRICE = 0.001; // SOL per token
+              price = FIXED_TOKEN_PRICE;
+              console.log(`Using fixed price for ${token.symbol}: ${price} SOL per token (fallback)`);
+            }
+            
             const balance = tokenReserveNumber;
             const totalValue = balance * price;
 
@@ -527,25 +533,37 @@ class BlockchainDataService {
             }
 
             // Get price from pool data if available
+            // Calculate dynamic price from pool reserves, fallback to fixed price
+            const FIXED_TOKEN_PRICE = 0.001; // SOL per token (fallback)
             let price = 0;
+            
             if (program) {
               try {
                 const tokenMint = new PublicKey(mintAddress);
                 const poolData = await this.getPoolData(program, tokenMint);
                 if (poolData && poolData.tokenReserve && poolData.solReserve) {
-                  const tokenReserveNumber =
-                    poolData.tokenReserve.toNumber() / Math.pow(10, decimals);
-                  const solReserveNumber =
-                    poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
-                  price =
-                    tokenReserveNumber > 0
-                      ? solReserveNumber / tokenReserveNumber
-                      : 0;
+                  // Calculate dynamic price from pool reserves: price = SOL reserve / token reserve
+                  const tokenReserveNumber = poolData.tokenReserve.toNumber();
+                  const solReserveNumber = poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
+                  
+                  if (tokenReserveNumber > 0) {
+                    price = solReserveNumber / tokenReserveNumber;
+                    console.log(`Dynamic price for ${mintAddress}: ${price} SOL per token (from reserves: ${solReserveNumber} SOL / ${tokenReserveNumber} tokens)`);
+                  } else {
+                    // Fallback to fixed price if token reserve is 0
+                    price = FIXED_TOKEN_PRICE;
+                    console.log(`Using fallback price for ${mintAddress}: ${price} SOL per token (token reserve is 0)`);
+                  }
+                } else {
+                  // Fallback to fixed price if pool data is incomplete
+                  price = FIXED_TOKEN_PRICE;
+                  console.log(`Using fallback price for ${mintAddress}: ${price} SOL per token (incomplete pool data)`);
                 }
               } catch (poolError) {
-                // Pool doesn't exist or other error - price remains 0
+                // Pool doesn't exist or other error - use fallback price
+                price = FIXED_TOKEN_PRICE;
                 console.debug(
-                  `No pool data for token ${mintAddress}:`,
+                  `Using fallback price for token ${mintAddress}: ${price} SOL per token (no pool data):`,
                   poolError
                 );
               }
