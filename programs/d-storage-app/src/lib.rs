@@ -8,8 +8,6 @@ declare_id!("HWHCbmSEp3V56MM7oVGYmdVLaFupSUUr9kpbfj2zAAuq");
 pub mod flexible_token_exchange {
     use super::*;
 
-
-
     /// Initialize a new liquidity pool for any token-SOL exchange
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
