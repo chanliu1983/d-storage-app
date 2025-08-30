@@ -1266,37 +1266,30 @@ const LiquidityPool: React.FC = () => {
   }, [connected, publicKey, program, selectedToken, removeLiquidityForm, fetchPoolData, fetchUserLpBalance, setStatus, setLoading, getLpMintPDA, getPoolPDA, getSolVaultPDA, getTokenVaultPDA]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-      
-      <div className="relative z-10 max-w-5xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-5xl mx-auto p-6">
         {/* Header Section */}
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl mb-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600/80 to-blue-600/80 px-8 py-12">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-8">
+          <div className="px-8 py-12">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-6 lg:space-y-0">
               <div className="flex items-center space-x-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg flex items-center justify-center">
+                <div className="w-16 h-16 bg-blue-500 rounded-lg shadow-sm flex items-center justify-center">
                   <Coins className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent mb-2">Liquidity Pools</h1>
-                  <p className="text-xl text-blue-100/90">Create and manage token-SOL liquidity pools</p>
+                  <h1 className="text-4xl font-bold text-gray-900 mb-2">Liquidity Pools</h1>
+                  <p className="text-xl text-gray-600">Create and manage token-SOL liquidity pools</p>
                 </div>
               </div>
               <div className="flex flex-col items-start lg:items-end space-y-4">
-                <div className="bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-1">
-                  <WalletMultiButton className="!bg-gradient-to-r !from-purple-500 !to-blue-500 hover:!from-purple-600 hover:!to-blue-600 !text-white !font-semibold !px-8 !py-4 !rounded-xl !transition-all !duration-300 !shadow-lg !border-0" />
+                <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-1">
+                  <WalletMultiButton className="!bg-blue-500 hover:!bg-blue-600 !text-white !font-semibold !px-8 !py-4 !rounded-lg !transition-all !duration-300 !shadow-sm !border-0" />
                 </div>
                 {connected && publicKey && (
-                  <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 rounded-xl px-4 py-2 shadow-lg">
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-sm">
                     <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg"></div>
-                      <span className="font-medium text-white text-sm">
+                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      <span className="font-medium text-gray-900 text-sm">
                         {publicKey.toString().slice(0, 6)}...{publicKey.toString().slice(-6)}
                       </span>
                     </div>
@@ -1309,27 +1302,27 @@ const LiquidityPool: React.FC = () => {
 
         {/* Content Section */}
         {!connected ? (
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-12">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-12">
             <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-br from-purple-500/20 to-blue-500/20 backdrop-blur-sm rounded-3xl border border-white/30 shadow-lg flex items-center justify-center mx-auto mb-8">
+              <div className="w-24 h-24 bg-blue-500 rounded-lg shadow-sm flex items-center justify-center mx-auto mb-8">
                 <Coins className="w-12 h-12 text-white" />
               </div>
-              <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent mb-4">Connect Your Wallet</h3>
-              <p className="text-lg text-white/80 mb-8 max-w-md mx-auto leading-relaxed">
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">Connect Your Wallet</h3>
+              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
                 Connect your Solana wallet to create and manage liquidity pools
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
-                <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6 shadow-lg">
-                  <div className="w-4 h-4 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mx-auto mb-3"></div>
-                  <span className="text-sm font-medium text-white">Create Pools</span>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full mx-auto mb-3"></div>
+                  <span className="text-sm font-medium text-gray-900">Create Pools</span>
                 </div>
-                <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6 shadow-lg">
-                  <div className="w-4 h-4 bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full mx-auto mb-3"></div>
-                  <span className="text-sm font-medium text-white">Manage Liquidity</span>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="w-4 h-4 bg-indigo-500 rounded-full mx-auto mb-3"></div>
+                  <span className="text-sm font-medium text-gray-900">Manage Liquidity</span>
                 </div>
-                <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6 shadow-lg">
-                  <div className="w-4 h-4 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full mx-auto mb-3"></div>
-                  <span className="text-sm font-medium text-white">Track Positions</span>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="w-4 h-4 bg-purple-500 rounded-full mx-auto mb-3"></div>
+                  <span className="text-sm font-medium text-gray-900">Track Positions</span>
                 </div>
               </div>
             </div>
@@ -1338,48 +1331,48 @@ const LiquidityPool: React.FC = () => {
           <div className="space-y-8">
             {/* Quick Action Section */}
             {showQuickAction && (
-              <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
-                <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <div className="flex items-start space-x-6 mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg flex items-center justify-center">
+                    <div className="w-16 h-16 bg-blue-500 rounded-lg shadow-sm flex items-center justify-center">
                       <Zap className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-white mb-2">Quick Setup - Create SOL Trading Pair</h3>
-                      <p className="text-lg text-white/80">Set up {TARGET_TOKEN_AMOUNT} tokens to trade with SOL</p>
-                      <p className="text-sm text-blue-300 mt-2">💡 Others will be able to buy your token using SOL</p>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Quick Setup - Create SOL Trading Pair</h3>
+                      <p className="text-lg text-gray-600">Set up {TARGET_TOKEN_AMOUNT} tokens to trade with SOL</p>
+                      <p className="text-sm text-blue-600 mt-2">💡 Others will be able to buy your token using SOL</p>
                     </div>
                   </div>
                   
-                  <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                       <div className="flex items-center space-x-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-purple-500/30 to-indigo-600/30 backdrop-blur-sm rounded-2xl border border-white/20 flex items-center justify-center shadow-lg">
+                        <div className="w-14 h-14 bg-purple-500 rounded-lg shadow-sm flex items-center justify-center">
                           <span className="text-white font-bold text-xl">T</span>
                         </div>
                         <div>
-                          <p className="font-semibold text-white text-lg">Target Token</p>
-                          <p className="text-white/70 font-mono text-sm">{TARGET_TOKEN_MINT.slice(0, 8)}...{TARGET_TOKEN_MINT.slice(-8)}</p>
-                          <p className="text-purple-300 font-medium text-sm">{TARGET_TOKEN_AMOUNT.toLocaleString()} tokens → SOL trading pair</p>
+                          <p className="font-semibold text-gray-900 text-lg">Target Token</p>
+                          <p className="text-gray-600 font-mono text-sm">{TARGET_TOKEN_MINT.slice(0, 8)}...{TARGET_TOKEN_MINT.slice(-8)}</p>
+                          <p className="text-purple-600 font-medium text-sm">{TARGET_TOKEN_AMOUNT.toLocaleString()} tokens → SOL trading pair</p>
                         </div>
                       </div>
                       
                       <div className="flex items-center space-x-4">
                         <div className="text-center">
-                          <p className="text-sm text-white/60">Amount</p>
-                          <p className="font-bold text-lg text-white">{TARGET_TOKEN_AMOUNT.toLocaleString()}</p>
+                          <p className="text-sm text-gray-600">Amount</p>
+                          <p className="font-bold text-lg text-gray-900">{TARGET_TOKEN_AMOUNT.toLocaleString()}</p>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-purple-300" />
+                        <ArrowRight className="w-6 h-6 text-purple-500" />
                         <div className="text-center">
-                          <p className="text-sm text-white/60">Trading Pair</p>
-                          <p className="font-bold text-lg text-purple-300">TOKEN/SOL</p>
+                          <p className="text-sm text-gray-600">Trading Pair</p>
+                          <p className="font-bold text-lg text-purple-600">TOKEN/SOL</p>
                         </div>
                       </div>
                       
-                      <div className="bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-1">
+                      <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-1">
                         <button
                           onClick={handleQuickAction}
-                          className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg"
+                          className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-8 py-4 rounded-lg transition-all duration-300 shadow-sm"
                         >
                           <span className="flex items-center justify-center">
                             <Zap className="w-5 h-5 mr-2" />
@@ -1389,14 +1382,14 @@ const LiquidityPool: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="mt-6 backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-2xl p-4">
+                    <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <div className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
                           <span className="text-white text-xs font-bold">i</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-blue-200">Creating a SOL Trading Pair</p>
-                          <p className="text-sm text-blue-300 mt-1">
+                          <p className="text-sm font-medium text-blue-900">Creating a SOL Trading Pair</p>
+                          <p className="text-sm text-blue-700 mt-1">
                             This will create a liquidity pool where others can buy your token using SOL. 
                             You'll need to provide both your tokens and SOL as initial liquidity.
                           </p>
@@ -1409,34 +1402,34 @@ const LiquidityPool: React.FC = () => {
             )}
             
             {/* Token Selection */}
-              <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500/30 to-indigo-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
-                    <Plus className="w-5 h-5 text-blue-300" />
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg shadow-sm flex items-center justify-center">
+                    <Plus className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white">Select Token</h3>
-                    <p className="text-white/70">Choose from popular tokens or enter custom token details</p>
+                    <h3 className="text-xl font-bold text-gray-900">Select Token</h3>
+                    <p className="text-gray-600">Choose from popular tokens or enter custom token details</p>
                   </div>
                 </div>
                 
                 {selectedToken ? (
-                  <div className="backdrop-blur-sm bg-green-500/10 border border-green-400/20 rounded-2xl p-6">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         {selectedToken.logoUri ? (
-                          <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-14 h-14 rounded-2xl shadow-lg border border-white/20" />
+                          <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-14 h-14 rounded-lg shadow-sm border border-gray-200" />
                         ) : (
-                          <div className="w-14 h-14 bg-gradient-to-br from-blue-500/30 to-indigo-600/30 backdrop-blur-sm rounded-2xl border border-white/20 flex items-center justify-center shadow-lg">
+                          <div className="w-14 h-14 bg-blue-500 rounded-lg shadow-sm flex items-center justify-center">
                             <span className="text-white font-bold text-xl">{selectedToken.symbol[0]}</span>
                           </div>
                         )}
                         <div>
-                          <p className="font-semibold text-green-200 text-lg">{selectedToken.name}</p>
-                          <p className="text-green-300 font-medium">{selectedToken.symbol} • {selectedToken.mint.slice(0, 8)}...{selectedToken.mint.slice(-8)}</p>
+                          <p className="font-semibold text-green-800 text-lg">{selectedToken.name}</p>
+                          <p className="text-green-600 font-medium">{selectedToken.symbol} • {selectedToken.mint.slice(0, 8)}...{selectedToken.mint.slice(-8)}</p>
                         </div>
                       </div>
-                      <div className="bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg p-1">
+                      <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-1">
                         <button
                           onClick={() => {
                             setSelectedToken(null);
@@ -1445,7 +1438,7 @@ const LiquidityPool: React.FC = () => {
                             setShowCustomEntry(false);
                             setForm(prev => ({ ...prev, selectedTokenMint: '' }));
                           }}
-                          className="bg-gradient-to-r from-red-500/80 to-red-600/80 hover:from-red-600 hover:to-red-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                          className="bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300"
                         >
                           <span className="text-sm font-medium">Clear</span>
                         </button>
@@ -1456,13 +1449,13 @@ const LiquidityPool: React.FC = () => {
                   <div className="space-y-6">
                     {/* Popular Tokens Dropdown */}
                     <div className="space-y-3">
-                      <label className="text-lg font-semibold text-white">
+                      <label className="text-lg font-semibold text-gray-900">
                         Popular Tokens
                       </label>
                       {loadingPopularTokens ? (
-                        <div className="flex items-center justify-center p-4 backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl">
-                          <Loader2 className="animate-spin w-5 h-5 text-blue-400 mr-2" />
-                          <span className="text-white/70">Loading tokens...</span>
+                        <div className="flex items-center justify-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <Loader2 className="animate-spin w-5 h-5 text-blue-500 mr-2" />
+                          <span className="text-blue-700">Loading tokens...</span>
                         </div>
                       ) : (
                         <select
@@ -1482,11 +1475,11 @@ const LiquidityPool: React.FC = () => {
                               setPoolData(null);
                             }
                           }}
-                          className="w-full p-4 backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-300 shadow-lg"
+                          className="w-full p-4 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 shadow-sm"
                         >
-                          <option value="" className="bg-gray-800 text-white">Select a popular token...</option>
+                          <option value="" className="bg-white text-gray-900">Select a popular token...</option>
                           {popularTokens.map((token) => (
-                            <option key={token.mint} value={token.mint} className="bg-gray-800 text-white">
+                            <option key={token.mint} value={token.mint} className="bg-white text-gray-900">
                               {token.name} ({token.symbol}) - {token.mint.slice(0, 8)}...{token.mint.slice(-8)}
                             </option>
                           ))}
@@ -1496,19 +1489,19 @@ const LiquidityPool: React.FC = () => {
 
                     {/* Divider */}
                     <div className="flex items-center space-x-4">
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-                      <span className="text-sm text-white/70 font-medium backdrop-blur-sm bg-white/10 px-3 py-1 rounded-full border border-white/20">OR</span>
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                      <div className="flex-1 h-px bg-gray-300"></div>
+                      <span className="text-sm text-gray-600 font-medium bg-gray-100 px-3 py-1 rounded-full border border-gray-200">OR</span>
+                      <div className="flex-1 h-px bg-gray-300"></div>
                     </div>
 
                     {/* Custom Token Entry Toggle */}
                     <button
                       onClick={() => setShowCustomEntry(!showCustomEntry)}
-                      className="w-full p-4 backdrop-blur-sm bg-white/5 border-2 border-dashed border-white/30 rounded-xl hover:border-blue-400/50 hover:bg-white/10 transition-all duration-300 shadow-lg"
+                      className="w-full p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 shadow-sm"
                     >
                       <div className="flex items-center justify-center space-x-2">
-                        <Plus className="w-5 h-5 text-blue-300" />
-                        <span className="text-white font-medium">
+                        <Plus className="w-5 h-5 text-blue-500" />
+                        <span className="text-gray-700 font-medium">
                           {showCustomEntry ? 'Hide Custom Token Entry' : 'Add Custom Token'}
                         </span>
                       </div>
@@ -1516,10 +1509,10 @@ const LiquidityPool: React.FC = () => {
 
                     {/* Custom Token Entry Form */}
                     {showCustomEntry && (
-                      <div className="space-y-6 p-6 backdrop-blur-sm bg-white/5 rounded-xl border border-white/20 shadow-lg">
+                      <div className="space-y-6 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <div className="space-y-3">
-                            <label className="text-lg font-semibold text-white">
+                            <label className="text-lg font-semibold text-gray-900">
                               Token Name
                             </label>
                             <input
@@ -1527,12 +1520,12 @@ const LiquidityPool: React.FC = () => {
                               value={customTokenName}
                               onChange={(e) => setCustomTokenName(e.target.value)}
                               placeholder="Enter token name (e.g., My Custom Token)"
-                              className="w-full p-4 backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-300 shadow-lg"
+                              className="w-full p-4 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 shadow-sm"
                             />
                           </div>
                           
                           <div className="space-y-3">
-                            <label className="text-lg font-semibold text-white">
+                            <label className="text-lg font-semibold text-gray-900">
                               Token Mint Address
                             </label>
                             <input
@@ -1540,7 +1533,7 @@ const LiquidityPool: React.FC = () => {
                               value={customTokenMint}
                               onChange={(e) => setCustomTokenMint(e.target.value)}
                               placeholder="Enter mint address (e.g., So11111...)"
-                              className="w-full p-4 backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-300 shadow-lg"
+                              className="w-full p-4 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 shadow-sm"
                             />
                           </div>
                         </div>
@@ -1548,7 +1541,7 @@ const LiquidityPool: React.FC = () => {
                         <button
                           onClick={handleCustomTokenSubmit}
                           disabled={loadingCustomToken || !customTokenName.trim() || !customTokenMint.trim()}
-                          className="w-full py-4 bg-gradient-to-r from-blue-500/80 to-indigo-600/80 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-500/50 disabled:to-gray-600/50 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg backdrop-blur-sm border border-white/20"
+                          className="w-full py-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-all duration-300 shadow-sm border border-blue-600"
                         >
                           {loadingCustomToken ? (
                             <span className="flex items-center justify-center">
@@ -1570,68 +1563,68 @@ const LiquidityPool: React.FC = () => {
 
               {/* Existing Pool Data Display */}
               {selectedToken && poolData && (
-                <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                   <div className="flex items-center space-x-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/30 to-indigo-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
-                      <svg className="w-6 h-6 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg border border-blue-200 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-2xl font-bold text-white">Existing Pool Found</h3>
-                      <p className="text-white/70">Pool already exists for {selectedToken.symbol}/SOL pair</p>
+                      <h3 className="text-2xl font-bold text-gray-900">Existing Pool Found</h3>
+                      <p className="text-gray-600">Pool already exists for {selectedToken.symbol}/SOL pair</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="backdrop-blur-sm bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-400/20 rounded-xl p-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
                         {selectedToken.logoUri ? (
-                          <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-5 h-5 rounded-full border border-white/20" />
+                          <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-5 h-5 rounded-full border border-gray-200" />
                         ) : (
-                          <div className="w-5 h-5 bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                            <span className="text-blue-300 font-bold text-xs">{selectedToken.symbol[0]}</span>
+                          <div className="w-5 h-5 bg-blue-100 rounded-full border border-blue-200 flex items-center justify-center">
+                            <span className="text-blue-600 font-bold text-xs">{selectedToken.symbol[0]}</span>
                           </div>
                         )}
-                        <span className="text-sm font-medium text-blue-200">{selectedToken.symbol} Reserve</span>
+                        <span className="text-sm font-medium text-blue-600">{selectedToken.symbol} Reserve</span>
                       </div>
-                      <p className="text-xl font-bold text-white">
+                      <p className="text-xl font-bold text-gray-900">
                         {poolData.tokenReserve ? (poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals || 9)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
                       </p>
                     </div>
                     
-                    <div className="backdrop-blur-sm bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-400/20 rounded-xl p-4">
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <div className="w-5 h-5 bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                          <span className="text-purple-300 font-bold text-xs">◎</span>
+                        <div className="w-5 h-5 bg-purple-100 rounded-full border border-purple-200 flex items-center justify-center">
+                          <span className="text-purple-600 font-bold text-xs">◎</span>
                         </div>
-                        <span className="text-sm font-medium text-purple-200">SOL Reserve</span>
+                        <span className="text-sm font-medium text-purple-600">SOL Reserve</span>
                       </div>
-                      <p className="text-xl font-bold text-white">
+                      <p className="text-xl font-bold text-gray-900">
                         {poolData.solReserve ? (poolData.solReserve.toNumber() / 1e9).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'} SOL
                       </p>
                     </div>
                     
-                    <div className="backdrop-blur-sm bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-400/20 rounded-xl p-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <svg className="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm font-medium text-green-200">LP Supply</span>
+                        <span className="text-sm font-medium text-green-600">LP Supply</span>
                       </div>
-                      <p className="text-xl font-bold text-white">
+                      <p className="text-xl font-bold text-gray-900">
                         {poolData.lpSupply ? (poolData.lpSupply.toNumber() / 1e9).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
                       </p>
                     </div>
                     
-                    <div className="backdrop-blur-sm bg-gradient-to-br from-yellow-500/10 to-orange-600/10 border border-yellow-400/20 rounded-xl p-4">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <div className="flex items-center space-x-2 mb-2">
-                        <svg className="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm font-medium text-yellow-200">Fee Rate</span>
+                        <span className="text-sm font-medium text-yellow-600">Fee Rate</span>
                       </div>
-                      <p className="text-xl font-bold text-white">
+                      <p className="text-xl font-bold text-gray-900">
                         {poolData.feeRate ? (poolData.feeRate / 100).toFixed(2) : '0.30'}%
                       </p>
                     </div>
@@ -1641,24 +1634,24 @@ const LiquidityPool: React.FC = () => {
 
               {/* Pool Configuration */}
               {selectedToken && (
-                  <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
                     <div className="flex items-center space-x-3 mb-6">
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-500/30 to-emerald-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
-                        <Plus className="w-6 h-6 text-green-300" />
+                      <div className="w-12 h-12 bg-green-100 rounded-xl border border-green-200 flex items-center justify-center shadow-md">
+                        <Plus className="w-6 h-6 text-green-600" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-white">{poolData ? 'Add Liquidity' : 'Initialize Liquidity Pool'}</h3>
-                        <p className="text-white/70">{poolData ? 'Add more liquidity to the existing' : 'Set initial liquidity amounts for'} {selectedToken.symbol}/SOL pair</p>
-                        <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-xl p-4 mt-4">
+                        <h3 className="text-2xl font-bold text-gray-900">{poolData ? 'Add Liquidity' : 'Initialize Liquidity Pool'}</h3>
+                        <p className="text-gray-600">{poolData ? 'Add more liquidity to the existing' : 'Set initial liquidity amounts for'} {selectedToken.symbol}/SOL pair</p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
                           <div className="flex items-start space-x-3">
-                            <div className="bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full p-2 mt-0.5 border border-white/20">
-                              <svg className="w-4 h-4 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                            <div className="bg-blue-100 rounded-full p-2 mt-0.5 border border-blue-200">
+                              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                               </svg>
                             </div>
                             <div>
-                              <h4 className="text-sm font-medium text-blue-200">Creating a SOL Trading Pair</h4>
-                              <p className="text-sm text-blue-300 mt-1">
+                              <h4 className="text-sm font-medium text-blue-800">Creating a SOL Trading Pair</h4>
+                              <p className="text-sm text-blue-700 mt-1">
                                 You're creating a liquidity pool where others can trade SOL for your token. 
                                 Your tokens will be available for purchase using SOL on the exchange.
                               </p>
@@ -1670,7 +1663,7 @@ const LiquidityPool: React.FC = () => {
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-white/80">
+                        <label className="text-sm font-medium text-gray-700">
                           {selectedToken.symbol} Amount
                         </label>
                         <div className="relative">
@@ -1691,26 +1684,26 @@ const LiquidityPool: React.FC = () => {
                               }
                             }}
                             placeholder={`Enter ${selectedToken.symbol} amount`}
-                            className={`w-full px-4 py-3 pr-24 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 ${validationErrors.tokenAmount ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50' : ''}`}
+                            className={`w-full px-4 py-3 pr-24 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${validationErrors.tokenAmount ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                             {selectedToken.logoUri ? (
-                              <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-6 h-6 rounded-full border border-white/20" />
+                              <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-6 h-6 rounded-full border border-gray-200" />
                             ) : (
-                              <div className="w-6 h-6 bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                                <span className="text-blue-300 font-bold text-xs">{selectedToken.symbol[0]}</span>
+                              <div className="w-6 h-6 bg-blue-100 rounded-full border border-blue-200 flex items-center justify-center">
+                                <span className="text-blue-600 font-bold text-xs">{selectedToken.symbol[0]}</span>
                               </div>
                             )}
-                            <span className="text-white/60 text-sm">{selectedToken.symbol}</span>
+                            <span className="text-gray-600 text-sm">{selectedToken.symbol}</span>
                           </div>
                           {validationErrors.tokenAmount && (
-                            <p className="text-red-400 text-sm mt-1">{validationErrors.tokenAmount}</p>
+                            <p className="text-red-500 text-sm mt-1">{validationErrors.tokenAmount}</p>
                           )}
                         </div>
                       </div>
                       
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-white/80">
+                        <label className="text-sm font-medium text-gray-700">
                           SOL Amount
                         </label>
                         <div className="relative">
@@ -1731,16 +1724,16 @@ const LiquidityPool: React.FC = () => {
                               }
                             }}
                             placeholder="Enter SOL amount"
-                            className={`w-full px-4 py-3 pr-20 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-200 ${validationErrors.solAmount ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/50' : ''}`}
+                            className={`w-full px-4 py-3 pr-20 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${validationErrors.solAmount ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                              <span className="text-purple-300 font-bold text-xs">◎</span>
+                            <div className="w-6 h-6 bg-purple-100 rounded-full border border-purple-200 flex items-center justify-center">
+                              <span className="text-purple-600 font-bold text-xs">◎</span>
                             </div>
-                            <span className="text-white/60 text-sm">SOL</span>
+                            <span className="text-gray-600 text-sm">SOL</span>
                           </div>
                           {validationErrors.solAmount && (
-                            <p className="text-red-400 text-sm mt-1">{validationErrors.solAmount}</p>
+                            <p className="text-red-500 text-sm mt-1">{validationErrors.solAmount}</p>
                           )}
                         </div>
                       </div>
@@ -1785,7 +1778,7 @@ const LiquidityPool: React.FC = () => {
                         console.log('=== End Button Click Debug ===');
                       }}
                       disabled={loading || !selectedToken || !form.tokenAmount || !form.solAmount || Object.keys(validationErrors).length > 0}
-                      className="w-full mt-8 px-6 py-4 bg-gradient-to-r from-green-500/20 to-emerald-600/20 backdrop-blur-sm border border-green-400/30 rounded-xl text-white font-semibold hover:from-green-500/30 hover:to-emerald-600/30 hover:border-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-green-500/20"
+                      className="w-full mt-8 px-6 py-4 bg-green-600 border border-green-600 rounded-xl text-white font-semibold hover:bg-green-700 hover:border-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
                       {loading ? (
                         <span className="flex items-center justify-center">
@@ -1809,25 +1802,25 @@ const LiquidityPool: React.FC = () => {
 
                 {/* Remove Liquidity Section */}
                 {poolData && selectedToken && (
-                  <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
                     <div className="flex items-center space-x-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-red-500/30 to-pink-600/30 backdrop-blur-sm rounded-xl border border-white/20 flex items-center justify-center shadow-md">
-                        <Minus className="w-5 h-5 text-red-300" />
+                      <div className="w-10 h-10 bg-red-100 rounded-xl border border-red-200 flex items-center justify-center shadow-md">
+                        <Minus className="w-5 h-5 text-red-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-white">Remove Liquidity</h3>
-                        <p className="text-white/70">Withdraw your tokens and SOL from the pool</p>
+                        <h3 className="text-xl font-bold text-gray-900">Remove Liquidity</h3>
+                        <p className="text-gray-600">Withdraw your tokens and SOL from the pool</p>
                       </div>
                     </div>
                     
                     {/* User Liquidity Position Display */}
-                    <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-xl p-6 mb-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold text-blue-200">Your Liquidity Position</h4>
+                        <h4 className="text-lg font-semibold text-blue-800">Your Liquidity Position</h4>
                         <div className="flex space-x-2">
                           <button
                             onClick={fetchUserLpBalance}
-                            className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-all duration-200"
+                            className="px-3 py-1 bg-blue-100 border border-blue-300 rounded-lg text-blue-700 text-sm hover:bg-blue-200 transition-all duration-200"
                           >
                             Refresh
                           </button>
@@ -1836,7 +1829,7 @@ const LiquidityPool: React.FC = () => {
                               console.log('🔧 [MANUAL DEBUG] Debug button clicked - triggering fetchUserLpBalance with full logging');
                               fetchUserLpBalance();
                             }}
-                            className="px-3 py-1 bg-orange-500/20 border border-orange-400/30 rounded-lg text-orange-300 text-sm hover:bg-orange-500/30 transition-all duration-200"
+                            className="px-3 py-1 bg-orange-100 border border-orange-300 rounded-lg text-orange-700 text-sm hover:bg-orange-200 transition-all duration-200"
                             title="Debug LP Balance - Check console for detailed logs"
                           >
                             🔧 Debug
@@ -1845,35 +1838,35 @@ const LiquidityPool: React.FC = () => {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
-                          <p className="text-sm font-medium text-white/70 mb-1">LP Token Balance</p>
-                          <p className="text-xl font-bold text-white">{userLpBalance ? userLpBalance.toFixed(4) : '0.0000'}</p>
-                          <p className="text-xs text-white/50">LP tokens</p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-sm font-medium text-gray-600 mb-1">LP Token Balance</p>
+                          <p className="text-xl font-bold text-gray-900">{userLpBalance ? userLpBalance.toFixed(4) : '0.0000'}</p>
+                          <p className="text-xs text-gray-500">LP tokens</p>
                         </div>
                         
                         {poolData && userLpBalance && (
                           <>
-                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
-                              <p className="text-sm font-medium text-white/70 mb-1">Pool Share</p>
-                              <p className="text-xl font-bold text-green-300">
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm font-medium text-gray-600 mb-1">Pool Share</p>
+                              <p className="text-xl font-bold text-green-600">
                                 {poolData.lpSupply.toNumber() > 0 
                                   ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * 100).toFixed(2)
                                   : '0.00'
                                 }%
                               </p>
-                              <p className="text-xs text-white/50">of total pool</p>
+                              <p className="text-xs text-gray-500">of total pool</p>
                             </div>
                             
-                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
-                              <p className="text-sm font-medium text-white/70 mb-1">Estimated Value</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm font-medium text-gray-600 mb-1">Estimated Value</p>
                               <div className="space-y-1">
-                                <p className="text-sm text-white">
+                                <p className="text-sm text-gray-900">
                                   {poolData.lpSupply.toNumber() > 0 
                                     ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals)).toFixed(4)
                                     : '0.0000'
                                   } {selectedToken.symbol}
                                 </p>
-                                <p className="text-sm text-white">
+                                <p className="text-sm text-gray-900">
                                   {poolData.lpSupply.toNumber() > 0 
                                     ? ((userLpBalance * Math.pow(10, 9) / poolData.lpSupply.toNumber()) * poolData.solReserve.toNumber() / LAMPORTS_PER_SOL).toFixed(4)
                                     : '0.0000'
@@ -1886,17 +1879,17 @@ const LiquidityPool: React.FC = () => {
                         
                         {(!poolData || !userLpBalance) && (
                           <>
-                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
-                              <p className="text-sm font-medium text-white/70 mb-1">Pool Share</p>
-                              <p className="text-xl font-bold text-white/50">0.00%</p>
-                              <p className="text-xs text-white/50">of total pool</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm font-medium text-gray-600 mb-1">Pool Share</p>
+                              <p className="text-xl font-bold text-gray-400">0.00%</p>
+                              <p className="text-xs text-gray-500">of total pool</p>
                             </div>
                             
-                            <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg p-4">
-                              <p className="text-sm font-medium text-white/70 mb-1">Estimated Value</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm font-medium text-gray-600 mb-1">Estimated Value</p>
                               <div className="space-y-1">
-                                <p className="text-sm text-white/50">0.0000 {selectedToken.symbol}</p>
-                                <p className="text-sm text-white/50">0.0000 SOL</p>
+                                <p className="text-sm text-gray-400">0.0000 {selectedToken.symbol}</p>
+                                <p className="text-sm text-gray-400">0.0000 SOL</p>
                               </div>
                             </div>
                           </>
@@ -1904,18 +1897,18 @@ const LiquidityPool: React.FC = () => {
                       </div>
                       
                       {userLpBalance && userLpBalance > 0 && (
-                        <div className="mt-4 p-3 bg-green-500/10 border border-green-400/20 rounded-lg">
-                          <p className="text-sm text-green-300 flex items-center">
-                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm text-green-700 flex items-center">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                             You have an active liquidity position in this pool
                           </p>
                         </div>
                       )}
                       
                       {(!userLpBalance || userLpBalance === 0) && (
-                        <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-400/20 rounded-lg">
-                          <div className="text-sm text-yellow-300 flex items-center">
-                            <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
+                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="text-sm text-yellow-700 flex items-center">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
                             You don't have any liquidity in this pool yet
                           </div>
                         </div>
@@ -1924,7 +1917,7 @@ const LiquidityPool: React.FC = () => {
                     
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-white/80">
+                        <label className="text-sm font-medium text-gray-700">
                           LP Tokens to Remove
                         </label>
                         <div className="relative">
@@ -1966,10 +1959,10 @@ const LiquidityPool: React.FC = () => {
                               }
                             }}
                             placeholder="Enter LP tokens amount"
-                            className="w-full px-4 py-3 pr-16 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-400/50 focus:border-red-400/50 transition-all duration-200"
+                            className="w-full px-4 py-3 pr-16 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                            <span className="text-white/60 text-sm">LP</span>
+                            <span className="text-gray-600 text-sm">LP</span>
                           </div>
                         </div>
                         {userLpBalance && (
@@ -2001,7 +1994,7 @@ const LiquidityPool: React.FC = () => {
                                 }
                               }
                             }}
-                            className="text-xs text-red-300 hover:text-red-200 transition-colors"
+                            className="text-xs text-red-600 hover:text-red-500 transition-colors"
                           >
                             Use Max: {userLpBalance.toFixed(4)}
                           </button>
@@ -2009,7 +2002,7 @@ const LiquidityPool: React.FC = () => {
                       </div>
                       
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-white/80">
+                        <label className="text-sm font-medium text-gray-700">
                           Min {selectedToken.symbol} Amount
                         </label>
                         <div className="relative">
@@ -2018,23 +2011,23 @@ const LiquidityPool: React.FC = () => {
                             value={removeLiquidityForm.minTokenAmount}
                             onChange={(e) => setRemoveLiquidityForm(prev => ({ ...prev, minTokenAmount: e.target.value }))}
                             placeholder="Minimum tokens to receive"
-                            className="w-full px-4 py-3 pr-20 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
+                            className="w-full px-4 py-3 pr-20 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
                             {selectedToken.logoUri ? (
-                              <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-4 h-4 rounded-full border border-white/20" />
+                              <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-4 h-4 rounded-full border border-gray-300" />
                             ) : (
-                              <div className="w-4 h-4 bg-gradient-to-br from-blue-500/30 to-blue-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                                <span className="text-blue-300 font-bold text-xs">{selectedToken.symbol[0]}</span>
+                              <div className="w-4 h-4 bg-blue-100 border border-gray-300 rounded-full flex items-center justify-center">
+                                <span className="text-blue-600 font-bold text-xs">{selectedToken.symbol[0]}</span>
                               </div>
                             )}
-                            <span className="text-white/60 text-xs">{selectedToken.symbol}</span>
+                            <span className="text-gray-600 text-xs">{selectedToken.symbol}</span>
                           </div>
                         </div>
                       </div>
                       
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-white/80">
+                        <label className="text-sm font-medium text-gray-700">
                           Min SOL Amount
                         </label>
                         <div className="relative">
@@ -2043,13 +2036,13 @@ const LiquidityPool: React.FC = () => {
                             value={removeLiquidityForm.minSolAmount}
                             onChange={(e) => setRemoveLiquidityForm(prev => ({ ...prev, minSolAmount: e.target.value }))}
                             placeholder="Minimum SOL to receive"
-                            className="w-full px-4 py-3 pr-16 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400/50 transition-all duration-200"
+                            className="w-full px-4 py-3 pr-16 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-                            <div className="w-4 h-4 bg-gradient-to-br from-purple-500/30 to-purple-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                              <span className="text-purple-300 font-bold text-xs">◎</span>
+                            <div className="w-4 h-4 bg-purple-100 border border-gray-300 rounded-full flex items-center justify-center">
+                              <span className="text-purple-600 font-bold text-xs">◎</span>
                             </div>
-                            <span className="text-white/60 text-xs">SOL</span>
+                            <span className="text-gray-600 text-xs">SOL</span>
                           </div>
                         </div>
                       </div>
@@ -2087,7 +2080,7 @@ const LiquidityPool: React.FC = () => {
                         }
                       }}
                       disabled={loading || !removeLiquidityForm.lpTokens || !removeLiquidityForm.minTokenAmount || !removeLiquidityForm.minSolAmount || !userLpBalance || parseFloat(removeLiquidityForm.lpTokens) > userLpBalance}
-                      className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-red-500/20 to-pink-600/20 backdrop-blur-sm border border-red-400/30 rounded-xl text-white font-semibold hover:from-red-500/30 hover:to-pink-600/30 hover:border-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-red-500/20"
+                      className="w-full mt-6 px-6 py-4 bg-red-600 border border-red-600 rounded-xl text-white font-semibold hover:bg-red-700 hover:border-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-lg"
                     >
                       {loading ? (
                         <span className="flex items-center justify-center">
@@ -2102,14 +2095,14 @@ const LiquidityPool: React.FC = () => {
                       )}
                     </button>
                     
-                    <div className="backdrop-blur-sm bg-yellow-500/10 border border-yellow-400/20 rounded-xl p-4 mt-4">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-4">
                       <div className="flex items-start space-x-2">
-                        <div className="w-5 h-5 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mt-0.5">
+                        <div className="w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center mt-0.5">
                           <span className="text-yellow-900 text-xs font-bold">!</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-yellow-200">Slippage Protection</p>
-                          <p className="text-sm text-yellow-300 mt-1">
+                          <p className="text-sm font-medium text-yellow-800">Slippage Protection</p>
+                          <p className="text-sm text-yellow-700 mt-1">
                             Set minimum amounts to protect against slippage. The transaction will fail if you receive less than the specified minimums.
                           </p>
                         </div>
@@ -2119,82 +2112,82 @@ const LiquidityPool: React.FC = () => {
                 )}
 
                 {poolData && (
-                  <div className="backdrop-blur-sm bg-gradient-to-br from-green-500/10 to-emerald-600/10 border border-green-400/20 rounded-2xl p-8 shadow-xl">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-lg">
                     <div className="flex items-start space-x-4 mb-8">
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-500/30 to-emerald-600/30 backdrop-blur-sm rounded-xl border border-green-400/30 flex items-center justify-center shadow-lg">
-                        <BarChart3 className="w-6 h-6 text-green-300" />
+                      <div className="w-12 h-12 bg-green-100 rounded-xl border border-green-200 flex items-center justify-center shadow-sm">
+                        <BarChart3 className="w-6 h-6 text-green-600" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-2">Pool Successfully Created</h3>
-                        <p className="text-white/70">Your liquidity pool is now active and ready for trading</p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Pool Successfully Created</h3>
+                        <p className="text-gray-600">Your liquidity pool is now active and ready for trading</p>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg">
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3">
                           {selectedToken?.logoUri ? (
-                            <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-5 h-5 rounded-full border border-white/20" />
+                            <img src={selectedToken.logoUri} alt={selectedToken.symbol} className="w-5 h-5 rounded-full border border-gray-300" />
                           ) : (
-                            <div className="w-5 h-5 bg-gradient-to-br from-blue-500/30 to-indigo-600/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                              <span className="text-blue-300 font-bold text-xs">{selectedToken?.symbol?.[0]}</span>
+                            <div className="w-5 h-5 bg-blue-100 rounded-full border border-gray-300 flex items-center justify-center">
+                              <span className="text-blue-600 font-bold text-xs">{selectedToken?.symbol?.[0]}</span>
                             </div>
                           )}
-                          <p className="text-sm font-medium text-white/80">{selectedToken?.symbol} Reserve</p>
+                          <p className="text-sm font-medium text-gray-700">{selectedToken?.symbol} Reserve</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">{poolData.tokenReserve.toString()}</p>
-                        <p className="text-white/60 text-sm">{selectedToken?.symbol} tokens</p>
+                        <p className="text-2xl font-bold text-gray-900">{poolData.tokenReserve.toString()}</p>
+                        <p className="text-gray-600 text-sm">{selectedToken?.symbol} tokens</p>
                       </div>
                       
-                      <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg">
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3">
-                          <div className="w-5 h-5 bg-gradient-to-br from-purple-500/30 to-pink-500/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                            <span className="text-purple-300 font-bold text-xs">◎</span>
+                          <div className="w-5 h-5 bg-purple-100 rounded-full border border-gray-300 flex items-center justify-center">
+                            <span className="text-purple-600 font-bold text-xs">◎</span>
                           </div>
-                          <p className="text-sm font-medium text-white/80">SOL Reserve</p>
+                          <p className="text-sm font-medium text-gray-700">SOL Reserve</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">{(poolData.solReserve.toNumber() / LAMPORTS_PER_SOL).toFixed(4)}</p>
-                        <p className="text-white/60 text-sm">SOL tokens</p>
+                        <p className="text-2xl font-bold text-gray-900">{(poolData.solReserve.toNumber() / LAMPORTS_PER_SOL).toFixed(4)}</p>
+                        <p className="text-gray-600 text-sm">SOL tokens</p>
                       </div>
                       
-                      <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg">
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3">
-                          <div className="w-5 h-5 bg-gradient-to-br from-green-500/30 to-emerald-500/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                            <span className="text-green-300 font-bold text-xs">LP</span>
+                          <div className="w-5 h-5 bg-green-100 rounded-full border border-gray-300 flex items-center justify-center">
+                            <span className="text-green-600 font-bold text-xs">LP</span>
                           </div>
-                          <p className="text-sm font-medium text-white/80">LP Token Supply</p>
+                          <p className="text-sm font-medium text-gray-700">LP Token Supply</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">{poolData.lpSupply.toString()}</p>
-                        <p className="text-white/60 text-sm">LP tokens</p>
+                        <p className="text-2xl font-bold text-gray-900">{poolData.lpSupply.toString()}</p>
+                        <p className="text-gray-600 text-sm">LP tokens</p>
                       </div>
                       
-                      <div className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg">
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-sm">
                         <div className="flex items-center space-x-2 mb-3">
-                          <div className="w-5 h-5 bg-gradient-to-br from-orange-500/30 to-red-500/30 backdrop-blur-sm rounded-full border border-white/20 flex items-center justify-center">
-                            <span className="text-orange-300 font-bold text-xs">%</span>
+                          <div className="w-5 h-5 bg-orange-100 rounded-full border border-gray-300 flex items-center justify-center">
+                            <span className="text-orange-600 font-bold text-xs">%</span>
                           </div>
-                          <p className="text-sm font-medium text-white/80">Fee Rate</p>
+                          <p className="text-sm font-medium text-gray-700">Fee Rate</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">{poolData.feeRate}%</p>
-                        <p className="text-white/60 text-sm">Trading fee</p>
+                        <p className="text-2xl font-bold text-gray-900">{poolData.feeRate}%</p>
+                        <p className="text-gray-600 text-sm">Trading fee</p>
                       </div>
                     </div>
                     
-                    <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/20 rounded-xl p-6 mt-6 shadow-lg">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6 shadow-sm">
                       <div className="flex items-center space-x-2 mb-2">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                        <p className="text-sm font-medium text-blue-300">Pool Status: Active</p>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <p className="text-sm font-medium text-blue-700">Pool Status: Active</p>
                       </div>
-                      <p className="text-white/70 text-sm">Your liquidity pool is now live and available for other users to trade against. You can manage your position or add more liquidity at any time.</p>
+                      <p className="text-blue-600 text-sm">Your liquidity pool is now live and available for other users to trade against. You can manage your position or add more liquidity at any time.</p>
                     </div>
                   </div>
                 )}
 
               {status && (
-                <div className={`backdrop-blur-sm border rounded-xl p-4 mt-6 shadow-lg ${
+                <div className={`border rounded-xl p-4 mt-6 shadow-sm ${
                   status.includes('Error') 
-                    ? 'bg-red-500/10 border-red-400/20 text-red-300' 
-                    : 'bg-green-500/10 border-green-400/20 text-green-300'
+                    ? 'bg-red-50 border-red-200 text-red-700' 
+                    : 'bg-green-50 border-green-200 text-green-700'
                 }`}>
                   <p className="font-medium">{status}</p>
                 </div>

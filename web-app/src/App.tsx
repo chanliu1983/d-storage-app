@@ -30,36 +30,27 @@ function App() {
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <Router>
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-              {/* Animated background elements */}
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 animate-pulse"></div>
-              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/50 via-transparent to-transparent"></div>
-              <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-blue-500/30 to-transparent rounded-full blur-3xl"></div>
-              <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full blur-2xl animate-pulse"></div>
-              
-              {/* Main content */}
-              <div className="relative z-10">
-                <Navigation />
-                <main className="container mx-auto px-4 py-8 lg:px-8">
-                  <div className="backdrop-blur-sm bg-white/5 rounded-3xl border border-white/10 shadow-2xl p-6 lg:p-8 min-h-[calc(100vh-12rem)]">
-                    <Routes>
-                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/trade" element={<TradingInterface />} />
-                      <Route path="/liquidity" element={<LiquidityPool />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                    </Routes>
-                  </div>
-                </main>
-              </div>
+            <div className="min-h-screen bg-gray-50">
+              <Navigation />
+              <main className="container mx-auto px-4 py-8 lg:px-8">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 lg:p-8 min-h-[calc(100vh-12rem)]">
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/trade" element={<TradingInterface />} />
+                    <Route path="/liquidity" element={<LiquidityPool />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                  </Routes>
+                </div>
+              </main>
             </div>
             <Toaster 
               position="bottom-right" 
               toastOptions={{
                 style: {
-                  background: 'rgba(15, 23, 42, 0.9)',
-                  backdropFilter: 'blur(16px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                  background: 'white',
+                  border: '1px solid #e5e7eb',
+                  color: '#374151',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
                 },
               }}
             />

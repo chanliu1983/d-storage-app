@@ -626,27 +626,21 @@ const TradingInterface: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
       {/* Header Section */}
-      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8 mb-8">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent mb-3">
+            <h1 className="text-4xl font-bold text-gray-900 mb-3">
               Trading Interface
             </h1>
-            <p className="text-white/70 text-lg">
+            <p className="text-gray-600 text-lg">
               Swap SOL for any available token with real-time pricing.
             </p>
           </div>
           <button
             onClick={refreshPrices}
             disabled={priceRefreshing}
-            className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/30 text-white rounded-2xl hover:bg-gradient-to-r hover:from-blue-500/30 hover:to-purple-500/30 disabled:opacity-50 transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm"
+            className="flex items-center space-x-3 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all duration-300 shadow-sm"
           >
             <RefreshCw className={`h-5 w-5 ${priceRefreshing ? 'animate-spin' : ''}`} />
             <span className="font-semibold">Refresh Prices</span>
@@ -656,13 +650,13 @@ const TradingInterface: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Swap Interface */}
-        <div className="lg:col-span-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-white/20 to-white/10 p-8 border-b border-white/20">
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-gray-50 p-8 border-b border-gray-200">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
                 <ArrowUpDown className="h-6 w-6 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-2xl font-bold text-gray-900">
                 Swap Tokens
               </h2>
             </div>
@@ -672,8 +666,8 @@ const TradingInterface: React.FC = () => {
 
             <div className="space-y-8">
               {/* From Token */}
-              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
-                <label className="block text-sm font-semibold text-white/80 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <label className="block text-sm font-semibold text-gray-900 mb-4">
                   From {isSolToToken ? '(SOL)' : '(Token)'}
                 </label>
                 <div className="flex items-center space-x-4">
@@ -685,12 +679,12 @@ const TradingInterface: React.FC = () => {
                       onChange={handleInputChange}
                       min="0"
                       step="0.000001"
-                      className="w-full px-4 py-4 pr-16 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
+                      className="w-full px-4 py-4 pr-16 text-xl bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
                       placeholder="0.0"
                     />
                     <button
                       onClick={handleMaxAmount}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm"
                     >
                       MAX
                     </button>
@@ -699,40 +693,40 @@ const TradingInterface: React.FC = () => {
                     <div className="relative">
                       <button
                          onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-                         className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
+                         className="flex items-center space-x-3 bg-white border border-gray-300 px-4 py-4 rounded-lg hover:bg-gray-50 transition-all duration-300"
                        >
                          {form.fromToken && form.fromToken !== 'SOL' ? (
                            <>
-                             <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
+                             <div className="w-8 h-8 bg-green-500 rounded-full shadow-sm"></div>
                              <div className="flex flex-col">
-                               <span className="font-bold text-white text-sm">
+                               <span className="font-bold text-gray-900 text-sm">
                                  {selectedToken?.symbol || `CUSTOM`}
                                </span>
                                {!selectedToken?.symbol && (
-                                 <span className="text-white/60 text-xs">
+                                 <span className="text-gray-600 text-xs">
                                    {form.fromToken.slice(0, 8)}...
                                  </span>
                                )}
                              </div>
                            </>
                          ) : (
-                           <span className="text-white/70 font-medium">Select Token</span>
+                           <span className="text-gray-600 font-medium">Select Token</span>
                          )}
-                         <ChevronDown className="h-5 w-5 text-white/70" />
+                         <ChevronDown className="h-5 w-5 text-gray-600" />
                        </button>
 
                        {/* Token Dropdown */}
                        {showTokenDropdown && (
-                         <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
                            <div className="p-4">
                              <div className="relative mb-4">
-                               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                <input
                                  type="text"
                                  placeholder="Search tokens..."
                                  value={searchTerm}
                                  onChange={(e) => setSearchTerm(e.target.value)}
-                                 className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                                 className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                />
                              </div>
                              <div className="space-y-2">
@@ -743,17 +737,17 @@ const TradingInterface: React.FC = () => {
                                      setForm(prev => ({ ...prev, fromToken: token.mint, fromAmount: 0, toAmount: 0 }));
                                      setShowTokenDropdown(false);
                                    }}
-                                   className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-xl transition-all duration-200 text-left"
+                                   className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-all duration-200 text-left"
                                  >
                                    <div className="flex items-center space-x-3">
-                                     <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full"></div>
+                                     <div className="w-8 h-8 bg-green-500 rounded-full"></div>
                                      <div>
-                                       <p className="font-bold text-white">{token.symbol}</p>
-                                       <p className="text-sm text-white/60">{token.name}</p>
+                                       <p className="font-bold text-gray-900">{token.symbol}</p>
+                                       <p className="text-sm text-gray-600">{token.name}</p>
                                      </div>
                                    </div>
                                    <div className="text-right">
-                                     <p className="font-medium text-white">{token.price.toFixed(8)} SOL</p>
+                                     <p className="font-medium text-gray-900">{token.price.toFixed(8)} SOL</p>
                                      <p className={`text-xs ${
                                        token.change24h >= 0 ? 'text-green-300' : 'text-red-300'
                                      }`}>
@@ -768,9 +762,9 @@ const TradingInterface: React.FC = () => {
                        )}
                      </div>
                   ) : (
-                    <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
-                      <span className="font-bold text-white text-lg">SOL</span>
+                    <div className="flex items-center space-x-3 bg-white border border-gray-300 px-4 py-4 rounded-lg">
+                      <div className="w-8 h-8 bg-yellow-500 rounded-full shadow-sm"></div>
+                      <span className="font-bold text-gray-900 text-lg">SOL</span>
                     </div>
                   )}
                 </div>
@@ -780,15 +774,15 @@ const TradingInterface: React.FC = () => {
               <div className="flex justify-center">
                 <button
                   onClick={handleSwapDirection}
-                  className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 backdrop-blur-sm border border-white/20"
+                  className="p-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-sm border border-gray-200"
                 >
                   <ArrowUpDown className="h-5 w-5" />
                 </button>
               </div>
 
               {/* To Token */}
-              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
-                <label className="block text-sm font-semibold text-white/80 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <label className="block text-sm font-semibold text-gray-900 mb-4">
                   To {isSolToToken ? '(Token)' : '(SOL)'}
                 </label>
                 <div className="flex items-center space-x-4">
@@ -800,40 +794,40 @@ const TradingInterface: React.FC = () => {
                       onChange={handleInputChange}
                       min="0"
                       step="0.000001"
-                      className="w-full px-4 py-4 text-xl bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 backdrop-blur-sm transition-all duration-300"
+                      className="w-full px-4 py-4 text-xl bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
                       placeholder="0.0"
                       readOnly
                     />
                   </div>
                   {!isSolToToken ? (
-                    <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm">
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg"></div>
-                      <span className="font-bold text-white text-lg">SOL</span>
+                    <div className="flex items-center space-x-3 bg-white border border-gray-300 px-4 py-4 rounded-lg">
+                      <div className="w-8 h-8 bg-yellow-500 rounded-full shadow-sm"></div>
+                      <span className="font-bold text-gray-900 text-lg">SOL</span>
                     </div>
                   ) : (
                     <div className="relative">
                       <button
                          onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-                         className="flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-white/30 px-4 py-4 rounded-xl backdrop-blur-sm hover:from-green-500/30 hover:to-blue-500/30 transition-all duration-300"
+                         className="flex items-center space-x-3 bg-white border border-gray-300 px-4 py-4 rounded-lg hover:bg-gray-50 transition-all duration-300"
                        >
                          {form.toToken ? (
                            <>
-                             <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full shadow-lg"></div>
+                             <div className="w-8 h-8 bg-green-500 rounded-full shadow-sm"></div>
                              <div className="flex flex-col">
-                               <span className="font-bold text-white text-sm">
+                               <span className="font-bold text-gray-900 text-sm">
                                  {selectedToken?.symbol || `CUSTOM`}
                                </span>
                                {!selectedToken?.symbol && (
-                                 <span className="text-white/60 text-xs">
+                                 <span className="text-gray-600 text-xs">
                                    {form.toToken.slice(0, 8)}...
                                  </span>
                                )}
                              </div>
                            </>
                          ) : (
-                           <span className="text-white/70 font-medium">Select Token</span>
+                           <span className="text-gray-600 font-medium">Select Token</span>
                          )}
-                         <ChevronDown className="h-5 w-5 text-white/70" />
+                         <ChevronDown className="h-5 w-5 text-gray-600" />
                        </button>
 
                        {/* Token Dropdown */}
@@ -887,8 +881,8 @@ const TradingInterface: React.FC = () => {
               </div>
 
               {/* Slippage Settings */}
-              <div className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl p-6">
-                <label className="block text-sm font-semibold text-white/80 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <label className="block text-sm font-semibold text-gray-900 mb-4">
                   Slippage Tolerance (%)
                 </label>
                 <div className="flex items-center space-x-6">
@@ -902,15 +896,15 @@ const TradingInterface: React.FC = () => {
                     step="0.1"
                     className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
                   />
-                  <span className="text-lg font-bold text-white bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/30 px-4 py-2 rounded-xl backdrop-blur-sm min-w-[4rem] text-center">
+                  <span className="text-lg font-bold text-gray-900 bg-white border border-gray-300 px-4 py-2 rounded-lg min-w-[4rem] text-center">
                     {form.slippage}%
                   </span>
                 </div>
               </div>
 
               {/* Custom Token Input Section */}
-              <div className="backdrop-blur-sm bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-white/20 rounded-2xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
                   <Search className="h-5 w-5" />
                   <span>Check Custom Token Pool</span>
                 </h3>
@@ -921,12 +915,12 @@ const TradingInterface: React.FC = () => {
                       value={customTokenInput}
                       onChange={(e) => setCustomTokenInput(e.target.value)}
                       placeholder="Enter token mint address (e.g., H8w8FMaZQu2DFPxMbouAyh7tMG5br7WC7gTz1EWJ54ZW)"
-                      className="flex-1 px-4 py-3 bg-white/10 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400/50 backdrop-blur-sm transition-all duration-300"
+                      className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
                     />
                     <button
                       onClick={handleCustomTokenCheck}
                       disabled={!customTokenInput.trim() || poolInfo.loading}
-                      className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold"
+                      className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold shadow-sm"
                     >
                       {poolInfo.loading ? 'Checking...' : 'Check Pool'}
                     </button>
@@ -936,8 +930,8 @@ const TradingInterface: React.FC = () => {
 
               {/* Liquidity Pool Information */}
               {(poolInfo.loading || poolInfo.exists || poolInfo.error) && (
-                <div className="backdrop-blur-sm bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-white/20 rounded-2xl p-6">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
                     <Info className="h-5 w-5" />
                     <span>Liquidity Pool Information</span>
                   </h3>
@@ -945,7 +939,7 @@ const TradingInterface: React.FC = () => {
                   {poolInfo.loading && (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                      <span className="ml-3 text-white/70">Checking liquidity pool...</span>
+                      <span className="ml-3 text-gray-600">Checking liquidity pool...</span>
                     </div>
                   )}
                   
@@ -953,41 +947,41 @@ const TradingInterface: React.FC = () => {
                     <div className="space-y-4">
                       <div className="flex items-center space-x-2 mb-4">
                         <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                        <span className="text-green-300 font-semibold">Liquidity Pool Found</span>
+                        <span className="text-green-600 font-semibold">Liquidity Pool Found</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex justify-between items-center py-2 border-b border-white/10">
-                          <span className="text-white/70 font-medium">Token Reserve:</span>
-                          <span className="font-bold text-white">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-gray-600 font-medium">Token Reserve:</span>
+                          <span className="font-bold text-gray-900">
                             {poolInfo.tokenReserve?.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center py-2 border-b border-white/10">
-                          <span className="text-white/70 font-medium">SOL Reserve:</span>
-                          <span className="font-bold text-white">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-gray-600 font-medium">SOL Reserve:</span>
+                          <span className="font-bold text-gray-900">
                             {poolInfo.solReserve?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || '0'} SOL
                           </span>
                         </div>
-                        <div className="flex justify-between items-center py-2 border-b border-white/10">
-                          <span className="text-white/70 font-medium">LP Supply:</span>
-                          <span className="font-bold text-white">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-gray-600 font-medium">LP Supply:</span>
+                          <span className="font-bold text-gray-900">
                             {poolInfo.lpSupply?.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center py-2 border-b border-white/10">
-                          <span className="text-white/70 font-medium">Fee Rate:</span>
-                          <span className="font-bold text-white">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-gray-600 font-medium">Fee Rate:</span>
+                          <span className="font-bold text-gray-900">
                             {poolInfo.feeRate ? (poolInfo.feeRate / 100).toFixed(2) : '0'}%
                           </span>
                         </div>
                       </div>
-                      <div className="mt-4 p-3 bg-green-500/20 border border-green-400/30 rounded-xl">
-                        <p className="text-green-300 text-sm mb-3">
+                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-green-700 text-sm mb-3">
                           ✓ This token can be swapped. Pool has sufficient liquidity.
                         </p>
                         <button
                           onClick={handleUseCustomTokenForSwap}
-                          className="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2"
+                          className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2 shadow-sm"
                         >
                           <ArrowUpDown className="h-4 w-4" />
                           <span>Use This Token for Swap</span>
@@ -1000,18 +994,18 @@ const TradingInterface: React.FC = () => {
                     <div className="space-y-4">
                       <div className="flex items-center space-x-2 mb-4">
                         <AlertCircle className="w-5 h-5 text-red-400" />
-                        <span className="text-red-300 font-semibold">Pool Check Result</span>
+                        <span className="text-red-600 font-semibold">Pool Check Result</span>
                       </div>
-                      <div className="p-4 bg-red-500/20 border border-red-400/30 rounded-xl">
-                        <p className="text-red-300 text-sm mb-3">
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-red-700 text-sm mb-3">
                           ⚠️ {poolInfo.error}
                         </p>
-                        <p className="text-red-200 text-xs mb-4">
+                        <p className="text-red-600 text-xs mb-4">
                           This token cannot be swapped because no liquidity pool exists. You need to create a liquidity pool first before you can trade this token.
                         </p>
                         <button
                           onClick={() => window.location.href = '/liquidity'}
-                          className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2 shadow-lg"
+                          className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-300 font-semibold text-sm flex items-center justify-center space-x-2 shadow-sm"
                         >
                           <TrendingUp className="h-4 w-4" />
                           <span>Create Liquidity Pool</span>
@@ -1024,37 +1018,37 @@ const TradingInterface: React.FC = () => {
 
               {/* Swap Details */}
               {selectedToken && form.fromAmount > 0 && (
-                <div className="backdrop-blur-sm bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-white/20 rounded-2xl p-6">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
                     <TrendingUp className="h-5 w-5" />
                     <span>Swap Details</span>
                   </h3>
                   <div className="space-y-4 text-sm">
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70 font-medium">Price:</span>
-                      <span className="font-bold text-white">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-gray-600 font-medium">Price:</span>
+                      <span className="font-bold text-gray-900">
                         1 {selectedToken.symbol} = {selectedToken.price.toFixed(8)} SOL
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70 font-medium">Price Impact:</span>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-gray-600 font-medium">Price Impact:</span>
                       <span className={`font-bold px-3 py-1 rounded-lg ${
                         calculatePriceImpact() > 5 
-                          ? 'text-red-300 bg-red-500/20 border border-red-400/30' 
-                          : 'text-green-300 bg-green-500/20 border border-green-400/30'
+                          ? 'text-red-700 bg-red-50 border border-red-200' 
+                          : 'text-green-700 bg-green-50 border border-green-200'
                       }`}>
                         {calculatePriceImpact().toFixed(2)}%
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-white/70 font-medium">Minimum Received:</span>
-                      <span className="font-bold text-white">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-gray-600 font-medium">Minimum Received:</span>
+                      <span className="font-bold text-gray-900">
                         {calculateMinReceived()} {selectedToken.symbol}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="text-white/70 font-medium">Liquidity:</span>
-                      <span className="font-bold text-white">
+                      <span className="text-gray-600 font-medium">Liquidity:</span>
+                      <span className="font-bold text-gray-900">
                         {selectedToken.liquidity.toLocaleString()} SOL
                       </span>
                     </div>
@@ -1066,7 +1060,7 @@ const TradingInterface: React.FC = () => {
               <button
                 onClick={executeSwap}
                 disabled={isSwapping || !publicKey || !form.toToken || form.fromAmount <= 0}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6 px-6 rounded-2xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 text-xl font-bold shadow-2xl hover:shadow-3xl transform hover:scale-[1.02] transition-all duration-300 border border-white/20 backdrop-blur-sm"
+                className="w-full bg-blue-600 text-white py-6 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 text-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 {transactionStatus === 'preparing' && (
                   <>
@@ -1117,41 +1111,41 @@ const TradingInterface: React.FC = () => {
         <div className="space-y-8">
           {/* Token Market Info */}
           {selectedToken && (
-            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-8">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center shadow-md">
                   <TrendingUp className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-white">
+                <h3 className="text-2xl font-bold text-gray-900">
                   {selectedToken.symbol} Market
                 </h3>
               </div>
               <div className="space-y-4">
-                <div className="flex justify-between items-center py-3 border-b border-white/10">
-                  <span className="text-white/70 font-medium">Price:</span>
-                  <span className="font-bold text-white text-lg">
+                <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                  <span className="text-gray-600 font-medium">Price:</span>
+                  <span className="font-bold text-gray-900 text-lg">
                     {selectedToken.price.toFixed(8)} SOL
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-3 border-b border-white/10">
-                  <span className="text-white/70 font-medium">24h Change:</span>
+                <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                  <span className="text-gray-600 font-medium">24h Change:</span>
                   <span className={`font-bold text-lg px-3 py-1 rounded-lg ${
                     selectedToken.change24h >= 0 
-                      ? 'text-green-300 bg-green-500/20 border border-green-400/30' 
-                      : 'text-red-300 bg-red-500/20 border border-red-400/30'
+                      ? 'text-green-700 bg-green-50 border border-green-200' 
+                      : 'text-red-700 bg-red-50 border border-red-200'
                   }`}>
                     {selectedToken.change24h >= 0 ? '+' : ''}{selectedToken.change24h.toFixed(2)}%
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-3 border-b border-white/10">
-                  <span className="text-white/70 font-medium">24h Volume:</span>
-                  <span className="font-bold text-white text-lg">
+                <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                  <span className="text-gray-600 font-medium">24h Volume:</span>
+                  <span className="font-bold text-gray-900 text-lg">
                     {selectedToken.volume24h.toLocaleString()} SOL
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3">
-                  <span className="text-white/70 font-medium">Liquidity:</span>
-                  <span className="font-bold text-white text-lg">
+                  <span className="text-gray-600 font-medium">Liquidity:</span>
+                  <span className="font-bold text-gray-900 text-lg">
                     {selectedToken.liquidity.toLocaleString()} SOL
                   </span>
                 </div>
@@ -1160,21 +1154,21 @@ const TradingInterface: React.FC = () => {
           )}
 
           {/* Recent Trades */}
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-8">
             <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center shadow-md">
                 <Clock className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-white">
+              <h3 className="text-2xl font-bold text-gray-900">
                 Recent Trades
               </h3>
             </div>
             {recentTrades.length === 0 ? (
               <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gradient-to-br from-gray-400/20 to-gray-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-8 w-8 text-white/50" />
+                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Clock className="h-8 w-8 text-gray-400" />
                 </div>
-                <p className="text-white/70 text-lg font-medium">
+                <p className="text-gray-600 text-lg font-medium">
                   No recent trades. Make your first swap!
                 </p>
               </div>
@@ -1183,22 +1177,22 @@ const TradingInterface: React.FC = () => {
                 {recentTrades.map((trade, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between py-4 px-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+                    className="flex items-center justify-between py-4 px-6 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all duration-300"
                   >
                     <div>
-                      <p className="text-lg font-bold text-white mb-1">
+                      <p className="text-lg font-bold text-gray-900 mb-1">
                         {trade.amount} {trade.from} → {trade.tokensReceived ? trade.tokensReceived.toFixed(6) : 'N/A'} {trade.to}
                       </p>
-                      <p className="text-sm text-white/60">
+                      <p className="text-sm text-gray-600">
                         {trade.timestamp.toLocaleTimeString()}
                         {trade.signature && (
-                          <span className="ml-2 text-blue-300">
+                          <span className="ml-2 text-blue-600">
                             • Tx: {trade.signature.slice(0, 8)}...
                           </span>
                         )}
                       </p>
                     </div>
-                    <span className="bg-gradient-to-r from-green-500/20 to-green-600/20 border border-green-400/30 text-green-300 text-sm font-bold px-4 py-2 rounded-xl">
+                    <span className="bg-green-50 border border-green-200 text-green-700 text-sm font-bold px-4 py-2 rounded-lg">
                       Success
                     </span>
                   </div>
