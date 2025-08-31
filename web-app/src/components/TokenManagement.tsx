@@ -23,7 +23,7 @@ const TokenManagement: React.FC = () => {
   const [form, setForm] = useState<TokenForm>({
     name: '',
     symbol: '',
-    decimals: 9,
+    decimals: 6,
     initialSupply: 1000000,
     description: '',
     logoFile: null
@@ -106,7 +106,7 @@ const TokenManagement: React.FC = () => {
       setForm({
         name: '',
         symbol: '',
-        decimals: 9,
+        decimals: 6,
         initialSupply: 1000000,
         description: '',
         logoFile: null

@@ -48,7 +48,7 @@ export class TokenMinter {
    * @param tokenAmount - Amount of tokens to mint (in token units, not raw units)
    * @param tokenName - Name of the token
    * @param tokenSymbol - Symbol of the token
-   * @param decimals - Number of decimal places (default: 9)
+   * @param decimals - Number of decimal places (default: 6)
    * @returns Promise with mint result
    */
   async createAndMintToken(
@@ -57,7 +57,7 @@ export class TokenMinter {
     tokenAmount: number,
     tokenName: string = 'Custom Token',
     tokenSymbol: string = 'CUSTOM',
-    decimals: number = 9
+    decimals: number = 6
   ): Promise<TokenMintResult> {
     try {
       if (!wallet.publicKey) {
@@ -216,7 +216,7 @@ export class TokenMinter {
       1000,
       'Custom Token 1000',
       'CT1000',
-      9
+      6
     );
   }
 }

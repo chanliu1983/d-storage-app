@@ -220,11 +220,12 @@ const TradingInterface: React.FC = () => {
     
     // AMM constant product formula: token_out = (token_reserve * sol_amount_after_fee) / (sol_reserve + sol_amount_after_fee)
     const solAmountInLamports = solAmountAfterFee * 1e9;
-    const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, 6);
+    const tokenDecimals = selectedToken?.decimals || 6;
+    const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, tokenDecimals);
     const solReserveRaw = poolInfo.solReserve * 1e9;
     
     const tokenAmountOut = (tokenReserveRaw * solAmountInLamports) / (solReserveRaw + solAmountInLamports);
-    const expectedTokens = tokenAmountOut / Math.pow(10, 6);
+    const expectedTokens = tokenAmountOut / Math.pow(10, tokenDecimals);
     
     // Apply slippage with safety buffer (same as executeSwap)
     const slippageMultiplier = (1 - form.slippage / 100);
@@ -268,11 +269,12 @@ const TradingInterface: React.FC = () => {
       if (poolInfo.tokenReserve && poolInfo.solReserve) {
         // Use AMM formula with actual pool reserves
         const solAmountInLamports = solAmountAfterFee * 1e9; // Convert SOL to lamports
-        const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, 6); // Convert to raw token units
+        const tokenDecimals = selectedToken?.decimals || 6;
+        const tokenReserveRaw = poolInfo.tokenReserve * Math.pow(10, tokenDecimals); // Convert to raw token units
         const solReserveRaw = poolInfo.solReserve * 1e9; // Convert to lamports
         
         const tokenAmountOut = (tokenReserveRaw * solAmountInLamports) / (solReserveRaw + solAmountInLamports);
-        expectedTokensAfterFee = tokenAmountOut / Math.pow(10, 6); // Convert back to token units
+        expectedTokensAfterFee = tokenAmountOut / Math.pow(10, tokenDecimals); // Convert back to token units
       } else {
         // Fallback to simple price calculation if pool data not available
         expectedTokensAfterFee = selectedToken?.price ? solAmountAfterFee / selectedToken.price : form.toAmount;
@@ -321,7 +323,7 @@ const TradingInterface: React.FC = () => {
       console.log('tokenMint:', tokenMint);
       console.log('solAmount:', form.fromAmount);
       console.log('minTokenAmount (final):', minTokenAmount);
-      console.log('minTokenAmount (raw units):', minTokenAmount * Math.pow(10, 6));
+      console.log('minTokenAmount (raw units):', minTokenAmount * Math.pow(10, selectedToken?.decimals || 6));
       console.log('publicKey:', publicKey?.toString());
       console.log('wallet connected:', !!wallet);
       console.log('===========================');
@@ -571,9 +573,11 @@ const TradingInterface: React.FC = () => {
         const poolData = await blockchainDataService['getPoolData'](program, tokenMintPubkey);
         
         if (poolData) {
-          const tokenReserve = poolData.tokenReserve.toNumber() / Math.pow(10, 6); // Assuming 6 decimals
+          // Get token decimals from selected token or default to 6
+          const tokenDecimals = selectedToken?.decimals || 6;
+          const tokenReserve = poolData.tokenReserve.toNumber() / Math.pow(10, tokenDecimals);
           const solReserve = poolData.solReserve.toNumber() / 1e9; // Convert lamports to SOL
-          const lpSupply = poolData.lpSupply.toNumber() / Math.pow(10, 6);
+          const lpSupply = poolData.lpSupply.toNumber() / Math.pow(10, 9); // LP tokens use 9 decimals
           const calculatedPrice = solReserve / tokenReserve; // Calculate price from reserves
           
           setPoolInfo({

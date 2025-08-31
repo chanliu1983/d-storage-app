@@ -1153,7 +1153,8 @@ const LiquidityPool: React.FC = () => {
         if (fetchedMetadata) {
           tokenMetadata = {
             ...fetchedMetadata,
-            name: customTokenName // Use custom name if provided
+            name: customTokenName, // Use custom name if provided
+            decimals: 6 // Force use 6 decimals for consistency
           };
         } else {
           // Create custom token info if metadata not found
@@ -1161,7 +1162,7 @@ const LiquidityPool: React.FC = () => {
             mint: customTokenMint,
             name: customTokenName,
             symbol: customTokenName.toUpperCase().slice(0, 6), // Use first 6 chars as symbol
-            decimals: 9, // Default to 9 decimals for SPL tokens
+            decimals: 6, // Default to 6 decimals for SPL tokens
             logoUri: undefined
           };
         }
@@ -1171,7 +1172,7 @@ const LiquidityPool: React.FC = () => {
           mint: customTokenMint,
           name: customTokenName,
           symbol: customTokenName.toUpperCase().slice(0, 6),
-          decimals: 9,
+          decimals: 6,
           logoUri: undefined
         };
       }
@@ -1276,7 +1277,7 @@ const LiquidityPool: React.FC = () => {
 
       // Convert amounts to BN
       const lpTokensAmount = new BN(parseFloat(removeLiquidityForm.lpTokens) * Math.pow(10, 9)); // Assuming 9 decimals for LP tokens
-      const minTokenAmount = new BN(parseFloat(removeLiquidityForm.minTokenAmount) * Math.pow(10, selectedToken.decimals || 9));
+      const minTokenAmount = new BN(parseFloat(removeLiquidityForm.minTokenAmount) * Math.pow(10, selectedToken.decimals || 6));
       const minSolAmount = new BN(parseFloat(removeLiquidityForm.minSolAmount) * LAMPORTS_PER_SOL);
 
       console.log('Remove Liquidity Amounts:', {
@@ -1646,7 +1647,7 @@ const LiquidityPool: React.FC = () => {
                         <span className="text-sm font-medium text-blue-600">{selectedToken.symbol} Reserve</span>
                       </div>
                       <p className="text-xl font-bold text-gray-900">
-                        {poolData.tokenReserve ? (poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals || 9)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
+                        {poolData.tokenReserve ? (poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken.decimals || 6)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'}
                       </p>
                     </div>
                     
@@ -2192,7 +2193,7 @@ const LiquidityPool: React.FC = () => {
                           )}
                           <p className="text-sm font-medium text-gray-700">{selectedToken?.symbol} Reserve</p>
                         </div>
-                        <p className="text-2xl font-bold text-gray-900">{poolData.tokenReserve.toString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{(poolData.tokenReserve.toNumber() / Math.pow(10, selectedToken?.decimals || 6)).toLocaleString()}</p>
                         <p className="text-gray-600 text-sm">{selectedToken?.symbol} tokens</p>
                       </div>
                       
@@ -2214,7 +2215,7 @@ const LiquidityPool: React.FC = () => {
                           </div>
                           <p className="text-sm font-medium text-gray-700">LP Token Supply</p>
                         </div>
-                        <p className="text-2xl font-bold text-gray-900">{poolData.lpSupply.toString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{(poolData.lpSupply.toNumber() / Math.pow(10, 9)).toLocaleString()}</p>
                         <p className="text-gray-600 text-sm">LP tokens</p>
                       </div>
                       

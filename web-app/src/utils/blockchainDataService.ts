@@ -662,7 +662,7 @@ class BlockchainDataService {
 
       // Get token metadata to determine correct decimals
       const tokenMetadata = await tokenRegistry.getTokenMetadata(this.connection, tokenMint);
-      const tokenDecimals = tokenMetadata?.decimals || 9; // Default to 9 if not found
+      const tokenDecimals = tokenMetadata?.decimals || 6; // Default to 6 if not found
       
       console.log(`Token ${tokenMint} has ${tokenDecimals} decimals`);
       
@@ -915,6 +915,7 @@ class BlockchainDataService {
             pool: poolPda,
             user: userPublicKey,
             userTokenAccount: userTokenAccountPda,
+            poolAuthority: poolAuthorityPda,
             tokenVault: tokenVaultPda,
             solVault: solVaultPda,
             tokenProgram: TOKEN_PROGRAM_ID,
@@ -1287,9 +1288,13 @@ class BlockchainDataService {
       try {
         const poolData = await this.getPoolData(program, tokenMintPubkey);
         if (poolData) {
+          // Determine token decimals for proper conversion
+          const tokenMetadata = await tokenRegistry.getTokenMetadata(this.connection, tokenMint);
+          const tokenDecimals = tokenMetadata?.decimals || 6;
+          
           const solReserve = poolData.solReserve.toNumber() / LAMPORTS_PER_SOL;
           const tokenReserve =
-            poolData.tokenReserve.toNumber() / Math.pow(10, 6);
+            poolData.tokenReserve.toNumber() / Math.pow(10, tokenDecimals);
 
           // Simple AMM calculation: tokens_out = (sol_in * token_reserve) / (sol_reserve + sol_in)
           // Apply 0.3% fee
@@ -1353,7 +1358,7 @@ class BlockchainDataService {
 
       // Determine token decimals for amount conversion
       const tokenMetadata = await tokenRegistry.getTokenMetadata(this.connection, tokenMint);
-      const tokenDecimals = tokenMetadata?.decimals || 9;
+      const tokenDecimals = tokenMetadata?.decimals || 6;
 
       // Convert amounts
       const tokenAmountBN = new BN(tokenAmount * Math.pow(10, tokenDecimals));

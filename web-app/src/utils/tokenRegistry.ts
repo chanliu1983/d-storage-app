@@ -142,7 +142,7 @@ class TokenRegistry {
         mint: mintAddress,
         name: `Token ${mintAddress.slice(0, 8)}...`,
         symbol: "UNKNOWN",
-        decimals: decimals,
+        decimals: 6, // Force 6 decimals for consistency
         verified: false,
       };
 
