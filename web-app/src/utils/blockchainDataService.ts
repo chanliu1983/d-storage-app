@@ -21,6 +21,7 @@ import {
 import type { FlexibleTokenExchange } from "../types/flexible_token_exchange";
 import idl from "../idl/flexible_token_exchange.json";
 import { tokenRegistry, type TokenInfo } from "./tokenRegistry";
+import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system";
 // TokenRegistry is already imported as tokenRegistry instance
 
 // Narrow wallet-related types to avoid using any
@@ -329,6 +330,26 @@ class BlockchainDataService {
       );
 
       const poolAccount = await program.account.liquidityPool.fetch(poolPDA);
+
+      // Validate SOL vault owner to ensure pool integrity
+      const [solVaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("sol_vault"), tokenMint.toBuffer()],
+        PROGRAM_ID
+      );
+      
+      const solVaultInfo = await this.connection.getAccountInfo(solVaultPda, { commitment: 'confirmed' });
+      if (!solVaultInfo) {
+        console.warn(`SOL vault does not exist for pool ${poolPDA.toString()}`);
+        this.poolCache.set(cacheKey, null);
+        return null;
+      }
+      
+      const solVaultOwner = solVaultInfo.owner;
+      if (!solVaultOwner.equals(SYSTEM_PROGRAM_ID)) {
+        console.warn(`Invalid SOL vault owner for pool ${poolPDA.toString()}. Expected: ${PROGRAM_ID.toString()}, Got: ${solVaultOwner.toString()}`);
+        this.poolCache.set(cacheKey, null);
+        return null;
+      }
 
       const poolData: PoolData = {
         tokenReserve: poolAccount.tokenReserve,

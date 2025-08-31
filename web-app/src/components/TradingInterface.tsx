@@ -623,7 +623,7 @@ const TradingInterface: React.FC = () => {
           setPoolInfo({ 
             exists: false, 
             loading: false, 
-            error: 'Pool data could not be retrieved' 
+            error: 'Pool validation failed - invalid SOL vault owner or pool configuration' 
           });
         }
       } else {

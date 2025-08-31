@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { Store, ArrowLeftRight, Droplets, Home } from 'lucide-react';
+import { Store, ArrowLeftRight, Droplets, Home, Coins } from 'lucide-react';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -10,6 +10,7 @@ const Navigation: React.FC = () => {
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/trade', label: 'Trading', icon: ArrowLeftRight },
     { path: '/liquidity', label: 'Liquidity', icon: Droplets },
+    { path: '/mint', label: 'Mint Tokens', icon: Coins },
   ];
 
   return (

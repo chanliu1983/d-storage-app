@@ -12,6 +12,7 @@ import Navigation from './components/Navigation';
 import TradingInterface from './components/TradingInterface';
 import LiquidityPool from './components/LiquidityPool';
 import Dashboard from './components/Dashboard';
+import TokenMinter from './components/TokenMinter';
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -39,6 +40,7 @@ function App() {
                     <Route path="/trade" element={<TradingInterface />} />
                     <Route path="/liquidity" element={<LiquidityPool />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/mint" element={<TokenMinter />} />
                   </Routes>
                 </div>
               </main>
