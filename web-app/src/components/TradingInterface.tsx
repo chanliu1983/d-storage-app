@@ -472,22 +472,64 @@ const TradingInterface: React.FC = () => {
       
       if (newDirection) {
         // Switching to SOL -> Token
-        setForm(prevForm => ({
-          fromToken: 'SOL',
-          toToken: prevForm.fromToken !== 'SOL' ? prevForm.fromToken : '',
-          fromAmount: 0,
-          toAmount: 0,
-          slippage: prevForm.slippage
-        }));
+        setForm(prevForm => {
+          // Preserve the current token selection when switching directions
+          const targetToken = prevForm.fromToken !== 'SOL' ? prevForm.fromToken : prevForm.toToken;
+          // Only use valid token addresses, clear pool info if no valid token
+          const validToken = targetToken && targetToken.trim() !== '' ? targetToken : '';
+          
+          // Clear pool info if no valid token is selected
+          if (!validToken) {
+            setPoolInfo({
+              exists: false,
+              loading: false,
+              error: null,
+              tokenReserve: null,
+              solReserve: null,
+              lpSupply: null,
+              feeRate: null,
+              price: null
+            });
+          }
+          
+          return {
+            fromToken: 'SOL',
+            toToken: validToken,
+            fromAmount: 0,
+            toAmount: 0,
+            slippage: prevForm.slippage
+          };
+        });
       } else {
         // Switching to Token -> SOL
-        setForm(prevForm => ({
-          fromToken: prevForm.toToken || '',
-          toToken: 'SOL',
-          fromAmount: 0,
-          toAmount: 0,
-          slippage: prevForm.slippage
-        }));
+        setForm(prevForm => {
+          // Preserve the current token selection when switching directions
+          const targetToken = prevForm.toToken !== 'SOL' ? prevForm.toToken : prevForm.fromToken;
+          // Only use valid token addresses, clear pool info if no valid token
+          const validToken = targetToken && targetToken.trim() !== '' ? targetToken : '';
+          
+          // Clear pool info if no valid token is selected
+          if (!validToken) {
+            setPoolInfo({
+              exists: false,
+              loading: false,
+              error: null,
+              tokenReserve: null,
+              solReserve: null,
+              lpSupply: null,
+              feeRate: null,
+              price: null
+            });
+          }
+          
+          return {
+            fromToken: validToken,
+            toToken: 'SOL',
+            fromAmount: 0,
+            toAmount: 0,
+            slippage: prevForm.slippage
+          };
+        });
       }
       
       return newDirection;
@@ -603,12 +645,19 @@ const TradingInterface: React.FC = () => {
 
   // Check pool when token selection changes
   useEffect(() => {
-    if (form.toToken) {
+    if (form.toToken && form.toToken.trim() !== '' && form.toToken !== 'SOL') {
       checkLiquidityPool(form.toToken);
     } else {
       setPoolInfo({ exists: false, loading: false });
     }
   }, [form.toToken, checkLiquidityPool]);
+
+  // Refresh pool data when trading direction changes
+  useEffect(() => {
+    if (form.toToken && form.toToken.trim() !== '' && form.toToken !== 'SOL') {
+      checkLiquidityPool(form.toToken);
+    }
+  }, [isSolToToken, checkLiquidityPool, form.toToken]);
 
   // Handle custom token input
   const handleCustomTokenCheck = () => {

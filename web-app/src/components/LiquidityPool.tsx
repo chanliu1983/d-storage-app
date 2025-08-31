@@ -289,6 +289,14 @@ const LiquidityPool: React.FC = () => {
 
       const tokenMint = new PublicKey(selectedToken.mint);
       
+      // Validate SOL vault owner before proceeding
+      console.log('Validating SOL vault owner before adding liquidity...');
+      setStatus('Validating SOL vault security...');
+      const vaultValidation = await validateSolVaultOwner(tokenMint);
+      if (!vaultValidation.isValid) {
+        throw new Error(vaultValidation.error || 'SOL vault owner validation failed');
+      }
+      
       // Get all required PDAs
       const [poolPda] = getPoolPDA(tokenMint);
       const [tokenVault] = getTokenVaultPDA(tokenMint);
@@ -519,6 +527,13 @@ const LiquidityPool: React.FC = () => {
       try {
         const existingPool = await connection.getAccountInfo(poolPda);
         if (existingPool) {
+          // If pool exists, validate SOL vault owner before proceeding
+          console.log('Pool exists, validating SOL vault owner...');
+          setStatus('Validating SOL vault security...');
+          const vaultValidation = await validateSolVaultOwner(tokenMint);
+          if (!vaultValidation.isValid) {
+            throw new Error(vaultValidation.error || 'SOL vault owner validation failed');
+          }
           throw new Error(`Pool for token ${selectedToken.symbol} already exists at ${poolPda.toString()}`);
         }
         console.log('Pool account does not exist yet - good for initialization');
@@ -1021,6 +1036,40 @@ const LiquidityPool: React.FC = () => {
     return undefined;
   }, []);
 
+  const validateSolVaultOwner = useCallback(async (tokenMint: PublicKey): Promise<{ isValid: boolean; error?: string }> => {
+    try {
+      const [solVault] = getSolVaultPDA(tokenMint);
+      
+      // Get the SOL vault account info
+      const solVaultAccountInfo = await connection.getAccountInfo(solVault);
+      
+      if (!solVaultAccountInfo) {
+        return {
+          isValid: false,
+          error: 'SOL vault account does not exist'
+        };
+      }
+      
+      // Check if the owner is the system program
+      const isSystemOwned = solVaultAccountInfo.owner.equals(SystemProgram.programId);
+      
+      if (!isSystemOwned) {
+        return {
+          isValid: false,
+          error: `SOL vault owner must be the system program for security. Current owner: ${solVaultAccountInfo.owner.toString()}`
+        };
+      }
+      
+      return { isValid: true };
+    } catch (error) {
+      console.error('Error validating SOL vault owner:', error);
+      return {
+        isValid: false,
+        error: `Failed to validate SOL vault owner: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }, [connection, getSolVaultPDA]);
+
   const validateForm = useCallback(() => {
     console.log('validateForm called with:', { selectedToken, tokenAmount: form.tokenAmount, solAmount: form.solAmount });
     const errors: { tokenAmount?: string; solAmount?: string; token?: string } = {};
@@ -1184,6 +1233,14 @@ const LiquidityPool: React.FC = () => {
 
     try {
       const tokenMint = new PublicKey(selectedToken.mint);
+      
+      // Validate SOL vault owner before proceeding
+      console.log('Validating SOL vault owner before removing liquidity...');
+      setStatus('Validating SOL vault security...');
+      const vaultValidation = await validateSolVaultOwner(tokenMint);
+      if (!vaultValidation.isValid) {
+        throw new Error(vaultValidation.error || 'SOL vault owner validation failed');
+      }
       
       // Derive PDAs using the same pattern as other functions
       const [poolPda] = getPoolPDA(tokenMint);
